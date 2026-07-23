@@ -1,0 +1,90 @@
+.header {
+  position: sticky;
+  z-index: 1000;
+  top: 0;
+  min-height: var(--header-height);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background-color: rgba(14, 14, 16, 0.88);
+  backdrop-filter: blur(16px);
+}
+
+.header .navbar {
+  min-height: var(--header-height);
+}
+
+.header__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: var(--color-text);
+  font-size: 1.2rem;
+  font-weight: 800;
+}
+
+.header__brand:hover {
+  color: var(--color-primary-light);
+}
+
+.header__logo {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  object-fit: contain;
+}
+
+.header__link {
+  display: block;
+  padding: 0.7rem 0.85rem;
+  border-radius: var(--radius-small);
+  color: var(--color-text-muted);
+  font-weight: 600;
+  transition:
+    color var(--transition),
+    background-color var(--transition);
+}
+
+.header__link:hover,
+.header__link--active {
+  background-color: var(--color-surface-light);
+  color: #ffffff;
+}
+
+.header__login-button,
+.header__register-button {
+  min-width: 100px;
+  font-weight: 700;
+}
+
+.header__register-button {
+  background-color: var(--color-primary);
+  color: #ffffff;
+}
+
+.header__register-button:hover {
+  background-color: var(--color-primary-dark);
+  color: #ffffff;
+}
+
+.navbar-toggler {
+  border-color: var(--color-border);
+}
+
+.navbar-toggler:focus {
+  box-shadow: 0 0 0 0.25rem rgba(145, 70, 255, 0.2);
+}
+
+@media (max-width: 991.98px) {
+  .header .navbar-collapse {
+    margin-top: 1rem;
+    padding: 1rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-medium);
+    background-color: var(--color-surface);
+  }
+
+  .header__login-button,
+  .header__register-button {
+    width: 100%;
+    margin-top: 0.5rem;
+  }
+}
