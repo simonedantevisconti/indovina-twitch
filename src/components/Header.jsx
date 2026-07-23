@@ -1,12 +1,42 @@
-import { Link, NavLink } from "react-router-dom";
+import { Link, NavLink, useNavigate } from "react-router-dom";
+
+import { useState } from "react";
+
+import { useAuth } from "../context/AuthContext";
 
 import logoIndovinaTwitch from "../assets/indovina-twitch-logo.png";
 
 import "../styles/header.css";
 
 export default function Header() {
+  const navigate = useNavigate();
+
+  const { currentUser, authLoading, logout } = useAuth();
+
+  const [logoutError, setLogoutError] = useState("");
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
   const getNavLinkClass = ({ isActive }) =>
     isActive ? "header__link header__link--active" : "header__link";
+
+  const handleLogout = async () => {
+    try {
+      setIsLoggingOut(true);
+      setLogoutError("");
+
+      await logout();
+
+      navigate("/", { replace: true });
+    } catch (error) {
+      console.error("Errore logout:", error);
+      setLogoutError("Non è stato possibile uscire.");
+    } finally {
+      setIsLoggingOut(false);
+    }
+  };
+
+  const username =
+    currentUser?.displayName || currentUser?.email?.split("@")[0] || "Profilo";
 
   return (
     <header className="header">
@@ -48,21 +78,51 @@ export default function Header() {
                 </a>
               </li>
 
-              <li className="nav-item">
-                <button
-                  className="btn btn-outline-light header__login-button"
-                  type="button"
-                >
-                  Accedi
-                </button>
-              </li>
+              {!authLoading && !currentUser && (
+                <>
+                  <li className="nav-item">
+                    <NavLink
+                      className="btn btn-outline-light header__login-button"
+                      to="/login"
+                    >
+                      Accedi
+                    </NavLink>
+                  </li>
 
-              <li className="nav-item">
-                <button className="btn header__register-button" type="button">
-                  Registrati
-                </button>
-              </li>
+                  <li className="nav-item">
+                    <NavLink
+                      className="btn header__register-button"
+                      to="/register"
+                    >
+                      Registrati
+                    </NavLink>
+                  </li>
+                </>
+              )}
+
+              {!authLoading && currentUser && (
+                <>
+                  <li className="nav-item">
+                    <NavLink className={getNavLinkClass} to="/profile">
+                      {username}
+                    </NavLink>
+                  </li>
+
+                  <li className="nav-item">
+                    <button
+                      className="btn btn-outline-light header__login-button"
+                      type="button"
+                      disabled={isLoggingOut}
+                      onClick={handleLogout}
+                    >
+                      {isLoggingOut ? "Uscita..." : "Logout"}
+                    </button>
+                  </li>
+                </>
+              )}
             </ul>
+
+            {logoutError && <p className="header__error">{logoutError}</p>}
           </div>
         </div>
       </nav>
