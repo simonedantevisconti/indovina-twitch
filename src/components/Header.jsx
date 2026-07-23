@@ -78,6 +78,14 @@ export default function Header() {
                 </a>
               </li>
 
+              {currentUser && (
+                <li className="nav-item">
+                  <NavLink className={getNavLinkClass} to="/rooms">
+                    Stanze pubbliche
+                  </NavLink>
+                </li>
+              )}
+              
               {!authLoading && !currentUser && (
                 <>
                   <li className="nav-item">

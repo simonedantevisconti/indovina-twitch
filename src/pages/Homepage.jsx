@@ -1,22 +1,31 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 
 import "../styles/homepage.css";
 
 export default function Homepage() {
   const navigate = useNavigate();
-
+  const { currentUser } = useAuth();
   const [roomCode, setRoomCode] = useState("");
   const [error, setError] = useState("");
 
   const handleCreateRoom = () => {
     setError("");
 
-    /*
-      Per ora utilizziamo una stanza dimostrativa.
-      In futuro il codice verrà creato da Firebase.
-    */
-    navigate("/game/demo-room");
+    if (!currentUser) {
+      navigate("/login", {
+        state: {
+          from: {
+            pathname: "/lobby",
+          },
+        },
+      });
+
+      return;
+    }
+
+    navigate("/lobby");
   };
 
   const handleJoinRoom = (event) => {
@@ -35,7 +44,24 @@ export default function Homepage() {
     }
 
     setError("");
-    navigate(`/game/${normalizedRoomCode}`);
+
+    if (!currentUser) {
+      navigate("/login", {
+        state: {
+          from: {
+            pathname: "/join",
+          },
+        },
+      });
+
+      return;
+    }
+
+    navigate("/join", {
+      state: {
+        roomCode: normalizedRoomCode,
+      },
+    });
   };
 
   return (
@@ -64,6 +90,28 @@ export default function Homepage() {
                   onClick={handleCreateRoom}
                 >
                   Crea una stanza
+                </button>
+
+                <button
+                  className="btn button-secondary"
+                  type="button"
+                  onClick={() => {
+                    if (!currentUser) {
+                      navigate("/login", {
+                        state: {
+                          from: {
+                            pathname: "/rooms",
+                          },
+                        },
+                      });
+
+                      return;
+                    }
+
+                    navigate("/rooms");
+                  }}
+                >
+                  Stanze pubbliche
                 </button>
 
                 <a className="btn button-secondary" href="#join-room">

@@ -9,7 +9,13 @@ import Homepage from "./pages/Homepage";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Profile from "./pages/Profile";
+import Lobby from "./pages/Lobby";
+import JoinRoom from "./pages/JoinRoom";
+import PublicRooms from "./pages/PublicRooms";
+import WaitingRoom from "./pages/WaitingRoom";
 import Game from "./pages/Game";
+import RoomNotFound from "./pages/RoomNotFound";
+import Unauthorized from "./pages/Unauthorized";
 import NotFound from "./pages/NotFound";
 
 function App() {
@@ -47,6 +53,42 @@ function App() {
           />
 
           <Route
+            path="/lobby"
+            element={
+              <ProtectedRoute>
+                <Lobby />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/join"
+            element={
+              <ProtectedRoute>
+                <JoinRoom />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/rooms"
+            element={
+              <ProtectedRoute>
+                <PublicRooms />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/room/:roomId"
+            element={
+              <ProtectedRoute>
+                <WaitingRoom />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
             path="/game/:roomId"
             element={
               <ProtectedRoute>
@@ -54,6 +96,10 @@ function App() {
               </ProtectedRoute>
             }
           />
+
+          <Route path="/room-not-found" element={<RoomNotFound />} />
+
+          <Route path="/unauthorized" element={<Unauthorized />} />
 
           <Route path="*" element={<NotFound />} />
         </Route>
