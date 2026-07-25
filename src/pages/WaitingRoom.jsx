@@ -1,9 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
-
+import { useEffect, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
-
 import { useAuth } from "../context/AuthContext";
-
+import streamers from "../data/streamers";
+import shuffleArray from "../utils/shuffleArray";
 import {
   joinRoomById,
   leaveRoom,
@@ -11,7 +10,6 @@ import {
   subscribeToRoom,
   togglePlayerReady,
 } from "../firebase/roomService";
-
 import "../styles/waiting-room.css";
 
 function PlayerSlot({ player, label, isReady }) {
@@ -119,18 +117,14 @@ export default function WaitingRoom() {
 
   const isHost = room?.hostId === currentUser.uid;
 
-  const playerIds = room?.playerIds || [];
-  const readyPlayers = room?.readyPlayers || [];
+  const playerIds = room?.playerIds ?? [];
+  const readyPlayers = room?.readyPlayers ?? [];
 
   const currentPlayerIsReady = readyPlayers.includes(currentUser.uid);
 
-  const allPlayersAreReady = useMemo(() => {
-    if (playerIds.length !== 2) {
-      return false;
-    }
-
-    return playerIds.every((playerId) => readyPlayers.includes(playerId));
-  }, [playerIds, readyPlayers]);
+  const allPlayersAreReady =
+    playerIds.length === 2 &&
+    playerIds.every((playerId) => readyPlayers.includes(playerId));
 
   const invitationLink = `${window.location.origin}/room/${roomId}`;
 
@@ -187,42 +181,80 @@ export default function WaitingRoom() {
     }
   };
 
-  const handleStart = async () => {
-    try {
-      setActionLoading(true);
-      setError("");
+const handleStart = async () => {
+  try {
+    setActionLoading(true);
+    setError("");
 
-      await startRoom({
-        roomId,
-        userId: currentUser.uid,
-      });
-    } catch (currentError) {
-      console.error("Errore avvio partita:", currentError);
+    const activeStreamerIds = streamers
+      .filter((streamer) => streamer.active)
+      .map((streamer) => streamer.id);
 
-      switch (currentError.message) {
-        case "room/not-enough-players":
-          setError("Deve entrare un secondo giocatore.");
-          break;
+    const boardStreamerIds =
+      shuffleArray(activeStreamerIds).slice(
+        0,
+        Math.min(
+          24,
+          activeStreamerIds.length,
+        ),
+      );
 
-        case "room/players-not-ready":
-          setError("Entrambi i giocatori devono essere pronti.");
-          break;
-
-        default:
-          setError("Non è stato possibile avviare la partita.");
-      }
+    if (boardStreamerIds.length < 2) {
+      setError(
+        "Non ci sono abbastanza streamer per avviare la partita.",
+      );
 
       setActionLoading(false);
+      return;
     }
-  };
 
-  useEffect(() => {
-    if (room?.status === "starting") {
-      navigate(`/game/${roomId}`, {
-        replace: true,
-      });
+    await startRoom({
+      roomId,
+      userId: currentUser.uid,
+      boardStreamerIds,
+    });
+  } catch (currentError) {
+    console.error(
+      "Errore avvio partita:",
+      currentError,
+    );
+
+    switch (currentError.message) {
+      case "room/not-enough-players":
+        setError(
+          "Deve entrare un secondo giocatore.",
+        );
+        break;
+
+      case "room/players-not-ready":
+        setError(
+          "Entrambi i giocatori devono essere pronti.",
+        );
+        break;
+
+      case "room/invalid-streamer-board":
+        setError(
+          "Non ci sono abbastanza streamer disponibili.",
+        );
+        break;
+
+      default:
+        setError(
+          "Non è stato possibile avviare la partita.",
+        );
     }
-  }, [room?.status, roomId, navigate]);
+
+    setActionLoading(false);
+  }
+};
+
+useEffect(() => {
+  if (room?.status === "playing") {
+    navigate(`/game/${roomId}`, {
+      replace: true,
+    });
+  }
+}, [room?.status, roomId, navigate]);
 
   if (loading) {
     return (

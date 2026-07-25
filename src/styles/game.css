@@ -75,6 +75,119 @@
   gap: 1rem;
 }
 
+.game-loading {
+  display: flex;
+  min-height: calc(
+    100vh - var(--header-height)
+  );
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 1rem;
+  color: var(--color-text-muted);
+}
+
+.turn-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-medium);
+  background-color: var(--color-surface);
+  color: var(--color-text-muted);
+}
+
+.turn-banner--active {
+  border-color: var(--color-primary);
+  background-color: rgba(
+    145,
+    70,
+    255,
+    0.14
+  );
+  color: var(--color-text);
+}
+
+.turn-banner strong {
+  color: var(--color-primary-light);
+  font-family: var(--font-code);
+}
+
+.game-secret-section {
+  display: grid;
+  grid-template-columns:
+    minmax(0, 2fr)
+    minmax(240px, 1fr);
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.game-secret-card,
+.game-opponent-card {
+  padding: 1.25rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-medium);
+  background-color: var(--color-surface);
+}
+
+.game-secret-card > span,
+.game-opponent-card > span {
+  display: block;
+  margin-bottom: 0.75rem;
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+}
+
+.game-secret-card__content {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.game-secret-card__content img {
+  width: 82px;
+  height: 82px;
+  border: 2px solid var(--color-primary);
+  border-radius: var(--radius-medium);
+  object-fit: cover;
+}
+
+.game-secret-card__content strong {
+  display: block;
+  margin-bottom: 0.25rem;
+  font-size: 1.4rem;
+}
+
+.game-secret-card__content small {
+  color: var(--color-primary-light);
+  font-family: var(--font-code);
+}
+
+.game-opponent-card {
+  display: flex;
+  justify-content: center;
+  flex-direction: column;
+}
+
+.game-opponent-card strong {
+  font-size: 1.4rem;
+}
+
+@media (max-width: 767.98px) {
+  .game-secret-section {
+    grid-template-columns: 1fr;
+  }
+
+  .turn-banner {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
 @media (max-width: 1399.98px) {
   .streamers-grid {
     grid-template-columns: repeat(6, minmax(0, 1fr));
