@@ -2,8 +2,7 @@ import {
   collection,
   deleteDoc,
   doc,
-  getDocs,
-  limit,
+  getDoc,
   onSnapshot,
   query,
   runTransaction,
@@ -29,36 +28,68 @@ const getPlayerData = (user) => ({
 async function findRoomByCode(roomCode) {
   const normalizedCode = normalizeRoomCode(roomCode);
 
-  const roomQuery = query(
-    roomsCollection,
-    where("roomCode", "==", normalizedCode),
-    limit(1),
-  );
+  const roomReference = doc(db, "rooms", normalizedCode);
 
-  const snapshot = await getDocs(roomQuery);
+  const roomSnapshot = await getDoc(roomReference);
 
-  if (snapshot.empty) {
+  if (!roomSnapshot.exists()) {
     return null;
   }
 
-  const roomDocument = snapshot.docs[0];
-
   return {
-    id: roomDocument.id,
-    ...roomDocument.data(),
+    id: roomSnapshot.id,
+    ...roomSnapshot.data(),
   };
 }
 
-async function generateUniqueRoomCode() {
+async function createRoomWithUniqueCode({ user, type }) {
   const maximumAttempts = 10;
 
   for (let attempt = 0; attempt < maximumAttempts; attempt += 1) {
     const roomCode = generateRoomCode();
-    const existingRoom = await findRoomByCode(roomCode);
 
-    if (!existingRoom) {
-      return roomCode;
+    const roomReference = doc(db, "rooms", roomCode);
+
+    const roomSnapshot = await getDoc(roomReference);
+
+    if (roomSnapshot.exists()) {
+      continue;
     }
+
+    const host = getPlayerData(user);
+
+    const roomData = {
+      roomCode,
+      type,
+      status: "waiting",
+
+      hostId: user.uid,
+      guestId: null,
+
+      players: {
+        host,
+        guest: null,
+      },
+
+      playerIds: [user.uid],
+      readyPlayers: [],
+
+      maxPlayers: 2,
+
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+
+      startedAt: null,
+      finishedAt: null,
+      gameId: null,
+    };
+
+    await setDoc(roomReference, roomData);
+
+    return {
+      id: roomCode,
+      ...roomData,
+    };
   }
 
   throw new Error("room/code-generation-failed");
@@ -73,42 +104,10 @@ export async function createRoom({ user, type = "private" }) {
     throw new Error("room/invalid-type");
   }
 
-  const roomReference = doc(roomsCollection);
-  const roomCode = await generateUniqueRoomCode();
-
-  const host = getPlayerData(user);
-
-  const roomData = {
-    roomCode,
+  return createRoomWithUniqueCode({
+    user,
     type,
-    status: "waiting",
-
-    hostId: user.uid,
-    guestId: null,
-
-    players: {
-      host,
-      guest: null,
-    },
-
-    playerIds: [user.uid],
-    readyPlayers: [],
-
-    maxPlayers: 2,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-
-    startedAt: null,
-    finishedAt: null,
-    gameId: null,
-  };
-
-  await setDoc(roomReference, roomData);
-
-  return {
-    id: roomReference.id,
-    ...roomData,
-  };
+  });
 }
 
 export async function joinRoomByCode({ roomCode, user }) {
@@ -116,14 +115,16 @@ export async function joinRoomByCode({ roomCode, user }) {
     throw new Error("room/auth-required");
   }
 
-  const room = await findRoomByCode(roomCode);
+  const normalizedCode = normalizeRoomCode(roomCode);
+
+  const room = await findRoomByCode(normalizedCode);
 
   if (!room) {
     throw new Error("room/not-found");
   }
 
   return joinRoomById({
-    roomId: room.id,
+    roomId: normalizedCode,
     user,
   });
 }
@@ -133,7 +134,9 @@ export async function joinRoomById({ roomId, user }) {
     throw new Error("room/auth-required");
   }
 
-  const roomReference = doc(db, "rooms", roomId);
+  const normalizedRoomId = normalizeRoomCode(roomId);
+
+  const roomReference = doc(db, "rooms", normalizedRoomId);
 
   await runTransaction(db, async (transaction) => {
     const roomSnapshot = await transaction.get(roomReference);
@@ -172,11 +175,13 @@ export async function joinRoomById({ roomId, user }) {
     });
   });
 
-  return roomId;
+  return normalizedRoomId;
 }
 
 export function subscribeToRoom({ roomId, onData, onError }) {
-  const roomReference = doc(db, "rooms", roomId);
+  const normalizedRoomId = normalizeRoomCode(roomId);
+
+  const roomReference = doc(db, "rooms", normalizedRoomId);
 
   return onSnapshot(
     roomReference,
@@ -223,7 +228,9 @@ export function subscribeToPublicRooms({ onData, onError }) {
 }
 
 export async function togglePlayerReady({ roomId, userId }) {
-  const roomReference = doc(db, "rooms", roomId);
+  const normalizedRoomId = normalizeRoomCode(roomId);
+
+  const roomReference = doc(db, "rooms", normalizedRoomId);
 
   await runTransaction(db, async (transaction) => {
     const roomSnapshot = await transaction.get(roomReference);
@@ -233,7 +240,9 @@ export async function togglePlayerReady({ roomId, userId }) {
     }
 
     const roomData = roomSnapshot.data();
+
     const playerIds = roomData.playerIds || [];
+
     const readyPlayers = roomData.readyPlayers || [];
 
     if (!playerIds.includes(userId)) {
@@ -254,7 +263,9 @@ export async function togglePlayerReady({ roomId, userId }) {
 }
 
 export async function leaveRoom({ roomId, userId }) {
-  const roomReference = doc(db, "rooms", roomId);
+  const normalizedRoomId = normalizeRoomCode(roomId);
+
+  const roomReference = doc(db, "rooms", normalizedRoomId);
 
   await runTransaction(db, async (transaction) => {
     const roomSnapshot = await transaction.get(roomReference);
@@ -264,7 +275,9 @@ export async function leaveRoom({ roomId, userId }) {
     }
 
     const roomData = roomSnapshot.data();
+
     const playerIds = roomData.playerIds || [];
+
     const readyPlayers = roomData.readyPlayers || [];
 
     if (!playerIds.includes(userId)) {
@@ -280,12 +293,15 @@ export async function leaveRoom({ roomId, userId }) {
       transaction.update(roomReference, {
         guestId: null,
         "players.guest": null,
+
         playerIds: playerIds.filter(
           (currentUserId) => currentUserId !== userId,
         ),
+
         readyPlayers: readyPlayers.filter(
           (currentUserId) => currentUserId !== userId,
         ),
+
         updatedAt: serverTimestamp(),
       });
     }
@@ -293,7 +309,9 @@ export async function leaveRoom({ roomId, userId }) {
 }
 
 export async function startRoom({ roomId, userId }) {
-  const roomReference = doc(db, "rooms", roomId);
+  const normalizedRoomId = normalizeRoomCode(roomId);
+
+  const roomReference = doc(db, "rooms", normalizedRoomId);
 
   await runTransaction(db, async (transaction) => {
     const roomSnapshot = await transaction.get(roomReference);
@@ -303,7 +321,9 @@ export async function startRoom({ roomId, userId }) {
     }
 
     const roomData = roomSnapshot.data();
+
     const playerIds = roomData.playerIds || [];
+
     const readyPlayers = roomData.readyPlayers || [];
 
     if (roomData.hostId !== userId) {
@@ -335,11 +355,15 @@ export async function startRoom({ roomId, userId }) {
 }
 
 export async function deleteRoom(roomId) {
-  await deleteDoc(doc(db, "rooms", roomId));
+  const normalizedRoomId = normalizeRoomCode(roomId);
+
+  await deleteDoc(doc(db, "rooms", normalizedRoomId));
 }
 
 export async function updateRoomStatus({ roomId, status }) {
-  await updateDoc(doc(db, "rooms", roomId), {
+  const normalizedRoomId = normalizeRoomCode(roomId);
+
+  await updateDoc(doc(db, "rooms", normalizedRoomId), {
     status,
     updatedAt: serverTimestamp(),
   });

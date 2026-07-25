@@ -30,7 +30,26 @@ export default function Lobby() {
     } catch (currentError) {
       console.error("Errore creazione stanza:", currentError);
 
-      setError("Non è stato possibile creare la stanza. Riprova.");
+      switch (currentError.code) {
+        case "permission-denied":
+          setError(
+            "Firestore ha bloccato la richiesta. Controlla che le regole siano state pubblicate.",
+          );
+          break;
+
+        case "unavailable":
+          setError("Firebase non è momentaneamente disponibile. Riprova.");
+          break;
+
+        default:
+          if (currentError.message === "room/code-generation-failed") {
+            setError(
+              "Non è stato possibile generare un codice stanza. Riprova.",
+            );
+          } else {
+            setError("Non è stato possibile creare la stanza. Riprova.");
+          }
+      }
     } finally {
       setIsCreating(false);
     }
