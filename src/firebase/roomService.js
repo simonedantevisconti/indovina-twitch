@@ -308,59 +308,87 @@ export async function leaveRoom({ roomId, userId }) {
   });
 }
 
-export async function startRoom({ roomId, userId, boardStreamerIds }) {
-  const normalizedRoomId = normalizeRoomCode(roomId);
+export async function startRoom({
+  roomId,
+  userId,
+  boardStreamerIds,
+}) {
+  const normalizedRoomId =
+    normalizeRoomCode(roomId);
 
-  if (!Array.isArray(boardStreamerIds) || boardStreamerIds.length < 2) {
-    throw new Error("room/invalid-streamer-board");
+  if (
+    !Array.isArray(boardStreamerIds) ||
+    boardStreamerIds.length < 2
+  ) {
+    throw new Error(
+      "room/invalid-streamer-board",
+    );
   }
 
-  const roomReference = doc(db, "rooms", normalizedRoomId);
+  const roomReference = doc(
+    db,
+    "rooms",
+    normalizedRoomId,
+  );
 
-  const gameReference = doc(db, "games", normalizedRoomId);
+  const gameReference = doc(
+    db,
+    "games",
+    normalizedRoomId,
+  );
 
-  await runTransaction(db, async (transaction) => {
-    const roomSnapshot = await transaction.get(roomReference);
+  await runTransaction(
+    db,
+    async (transaction) => {
+      const roomSnapshot =
+        await transaction.get(roomReference);
 
-    const gameSnapshot = await transaction.get(gameReference);
+      if (!roomSnapshot.exists()) {
+        throw new Error("room/not-found");
+      }
 
-    if (!roomSnapshot.exists()) {
-      throw new Error("room/not-found");
-    }
+      const roomData = roomSnapshot.data();
 
-    const roomData = roomSnapshot.data();
+      const playerIds =
+        roomData.playerIds || [];
 
-    const playerIds = roomData.playerIds || [];
+      const readyPlayers =
+        roomData.readyPlayers || [];
 
-    const readyPlayers = roomData.readyPlayers || [];
+      if (roomData.hostId !== userId) {
+        throw new Error("room/host-only");
+      }
 
-    if (roomData.hostId !== userId) {
-      throw new Error("room/host-only");
-    }
+      if (roomData.status !== "waiting") {
+        throw new Error(
+          "room/not-available",
+        );
+      }
 
-    if (roomData.status !== "waiting" && roomData.status !== "starting") {
-      throw new Error("room/not-available");
-    }
+      if (playerIds.length !== 2) {
+        throw new Error(
+          "room/not-enough-players",
+        );
+      }
 
-    if (playerIds.length !== 2) {
-      throw new Error("room/not-enough-players");
-    }
+      const everyPlayerIsReady =
+        playerIds.every((playerId) =>
+          readyPlayers.includes(playerId),
+        );
 
-    const everyPlayerIsReady = playerIds.every((playerId) =>
-      readyPlayers.includes(playerId),
-    );
+      if (!everyPlayerIsReady) {
+        throw new Error(
+          "room/players-not-ready",
+        );
+      }
 
-    if (!everyPlayerIsReady) {
-      throw new Error("room/players-not-ready");
-    }
-
-    /*
-     * Se il documento esiste già non ricreiamo
-     * la partita durante un doppio clic.
-     */
-    if (!gameSnapshot.exists()) {
       const randomStartingPlayer =
-        playerIds[Math.floor(Math.random() * playerIds.length)];
+        playerIds[
+          Math.floor(
+            Math.random() *
+              playerIds.length,
+          )
+        ];
 
       transaction.set(gameReference, {
         roomId: normalizedRoomId,
@@ -370,9 +398,12 @@ export async function startRoom({ roomId, userId, boardStreamerIds }) {
 
         boardStreamerIds,
 
-        currentTurn: randomStartingPlayer,
+        currentTurn:
+          randomStartingPlayer,
+
         turnNumber: 1,
         pendingQuestionId: null,
+
         status: "playing",
 
         winnerId: null,
@@ -382,15 +413,20 @@ export async function startRoom({ roomId, userId, boardStreamerIds }) {
         updatedAt: serverTimestamp(),
         finishedAt: null,
       });
-    }
 
-    transaction.update(roomReference, {
-      status: "playing",
-      gameId: normalizedRoomId,
-      startedAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
-  });
+      transaction.update(
+        roomReference,
+        {
+          status: "playing",
+          gameId: normalizedRoomId,
+          startedAt:
+            serverTimestamp(),
+          updatedAt:
+            serverTimestamp(),
+        },
+      );
+    },
+  );
 }
 
 export async function deleteRoom(roomId) {

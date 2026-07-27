@@ -177,6 +177,66 @@
   font-size: 1.4rem;
 }
 
+/* Area domande e storico */
+
+.game-page .card {
+  background-color: var(--color-surface) !important;
+  color: var(--color-text);
+}
+
+.game-page .card-body {
+  color: var(--color-text);
+}
+
+.game-page .card p,
+.game-page .card h2,
+.game-page .card strong,
+.game-page .card label {
+  color: var(--color-text);
+}
+
+.game-page .card small,
+.game-page .text-secondary {
+  color: var(--color-text-muted) !important;
+}
+
+.game-page textarea.form-control {
+  background-color: var(--color-background);
+  color: var(--color-text);
+}
+
+.game-page textarea.form-control::placeholder {
+  color: var(--color-text-muted);
+}
+
+.game-page textarea.form-control:focus {
+  background-color: var(--color-background);
+  color: var(--color-text);
+}
+
+.game-page .alert-info {
+  border-color: var(--color-primary);
+  background-color: rgba(145, 70, 255, 0.15);
+  color: var(--color-text);
+}
+
+.game-page .alert-info strong {
+  color: var(--color-primary-light);
+}
+
+.game-page .border-secondary {
+  border-color: var(--color-border) !important;
+}
+
+.game-page .badge.text-bg-primary {
+  background-color: var(--color-primary) !important;
+  color: #ffffff !important;
+}
+
+.game-page .badge.text-bg-warning {
+  color: #111111 !important;
+}
+
 @media (max-width: 767.98px) {
   .game-secret-section {
     grid-template-columns: 1fr;
