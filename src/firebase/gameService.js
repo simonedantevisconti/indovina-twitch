@@ -1,7 +1,10 @@
 import {
+  collection,
   doc,
   getDoc,
   onSnapshot,
+  orderBy,
+  query,
   runTransaction,
   serverTimestamp,
   setDoc,
@@ -241,6 +244,240 @@ export async function resetEliminatedStreamers({
           updatedAt: serverTimestamp(),
         },
       );
+    },
+  );
+}
+
+export function subscribeToQuestions({
+  roomId,
+  onData,
+  onError,
+}) {
+  const normalizedRoomId =
+    normalizeRoomId(roomId);
+
+  const questionsReference = collection(
+    db,
+    "games",
+    normalizedRoomId,
+    "questions",
+  );
+
+  const questionsQuery = query(
+    questionsReference,
+    orderBy("createdAt", "asc"),
+  );
+
+  return onSnapshot(
+    questionsQuery,
+    (snapshot) => {
+      const questions = snapshot.docs.map(
+        (questionDocument) => ({
+          id: questionDocument.id,
+          ...questionDocument.data(),
+        }),
+      );
+
+      onData(questions);
+    },
+    onError,
+  );
+}
+
+export async function submitQuestion({
+  roomId,
+  userId,
+  text,
+}) {
+  const normalizedRoomId =
+    normalizeRoomId(roomId);
+
+  const normalizedText = text.trim();
+
+  if (!normalizedText) {
+    throw new Error("game/empty-question");
+  }
+
+  if (normalizedText.length > 200) {
+    throw new Error("game/question-too-long");
+  }
+
+  const gameReference = doc(
+    db,
+    "games",
+    normalizedRoomId,
+  );
+
+  const questionReference = doc(
+    collection(
+      db,
+      "games",
+      normalizedRoomId,
+      "questions",
+    ),
+  );
+
+  await runTransaction(
+    db,
+    async (transaction) => {
+      const gameSnapshot =
+        await transaction.get(gameReference);
+
+      if (!gameSnapshot.exists()) {
+        throw new Error("game/not-found");
+      }
+
+      const gameData = gameSnapshot.data();
+
+      if (gameData.status !== "playing") {
+        throw new Error("game/not-playing");
+      }
+
+      if (
+        !gameData.playerIds?.includes(userId)
+      ) {
+        throw new Error("game/unauthorized");
+      }
+
+      if (gameData.currentTurn !== userId) {
+        throw new Error("game/not-your-turn");
+      }
+
+      if (gameData.pendingQuestionId) {
+        throw new Error(
+          "game/question-already-pending",
+        );
+      }
+
+      transaction.set(questionReference, {
+        authorId: userId,
+        text: normalizedText,
+
+        answer: null,
+        answeredBy: null,
+
+        status: "pending",
+
+        turnNumber:
+          gameData.turnNumber || 1,
+
+        createdAt: serverTimestamp(),
+        answeredAt: null,
+      });
+
+      transaction.update(gameReference, {
+        pendingQuestionId:
+          questionReference.id,
+        updatedAt: serverTimestamp(),
+      });
+    },
+  );
+
+  return questionReference.id;
+}
+
+export async function answerQuestion({
+  roomId,
+  questionId,
+  userId,
+  answer,
+}) {
+  const allowedAnswers = [
+    "yes",
+    "no",
+    "unknown",
+  ];
+
+  if (!allowedAnswers.includes(answer)) {
+    throw new Error("game/invalid-answer");
+  }
+
+  const normalizedRoomId =
+    normalizeRoomId(roomId);
+
+  const gameReference = doc(
+    db,
+    "games",
+    normalizedRoomId,
+  );
+
+  const questionReference = doc(
+    db,
+    "games",
+    normalizedRoomId,
+    "questions",
+    questionId,
+  );
+
+  await runTransaction(
+    db,
+    async (transaction) => {
+      const gameSnapshot =
+        await transaction.get(gameReference);
+
+      const questionSnapshot =
+        await transaction.get(
+          questionReference,
+        );
+
+      if (
+        !gameSnapshot.exists() ||
+        !questionSnapshot.exists()
+      ) {
+        throw new Error("game/not-found");
+      }
+
+      const gameData = gameSnapshot.data();
+      const questionData =
+        questionSnapshot.data();
+
+      if (gameData.status !== "playing") {
+        throw new Error("game/not-playing");
+      }
+
+      if (
+        !gameData.playerIds?.includes(userId)
+      ) {
+        throw new Error("game/unauthorized");
+      }
+
+      if (
+        questionData.status !== "pending"
+      ) {
+        throw new Error(
+          "game/question-already-answered",
+        );
+      }
+
+      if (questionData.authorId === userId) {
+        throw new Error(
+          "game/cannot-answer-own-question",
+        );
+      }
+
+      const nextPlayerId =
+        questionData.authorId ===
+        gameData.playerIds[0]
+          ? gameData.playerIds[1]
+          : gameData.playerIds[0];
+
+      transaction.update(
+        questionReference,
+        {
+          answer,
+          answeredBy: userId,
+          status: "answered",
+          answeredAt: serverTimestamp(),
+        },
+      );
+
+      transaction.update(gameReference, {
+        currentTurn: nextPlayerId,
+        turnNumber:
+          (gameData.turnNumber || 1) + 1,
+        pendingQuestionId: null,
+        updatedAt: serverTimestamp(),
+      });
     },
   );
 }
