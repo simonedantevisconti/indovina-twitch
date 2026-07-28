@@ -481,3 +481,180 @@ export async function answerQuestion({
     },
   );
 }
+
+export async function submitFinalGuess({
+  roomId,
+  userId,
+  streamerId,
+}) {
+  const normalizedRoomId =
+    normalizeRoomId(roomId);
+
+  if (!streamerId) {
+    throw new Error("game/invalid-guess");
+  }
+
+  const gameReference = doc(
+    db,
+    "games",
+    normalizedRoomId,
+  );
+
+  await runTransaction(
+    db,
+    async (transaction) => {
+      const gameSnapshot =
+        await transaction.get(gameReference);
+
+      if (!gameSnapshot.exists()) {
+        throw new Error("game/not-found");
+      }
+
+      const gameData = gameSnapshot.data();
+
+      if (gameData.status !== "playing") {
+        throw new Error("game/not-playing");
+      }
+
+      if (
+        !gameData.playerIds?.includes(userId)
+      ) {
+        throw new Error("game/unauthorized");
+      }
+
+      if (gameData.currentTurn !== userId) {
+        throw new Error("game/not-your-turn");
+      }
+
+      if (gameData.pendingQuestionId) {
+        throw new Error(
+          "game/question-pending",
+        );
+      }
+
+      if (gameData.pendingGuess) {
+        throw new Error(
+          "game/guess-already-pending",
+        );
+      }
+
+      if (
+        !gameData.boardStreamerIds?.includes(
+          streamerId,
+        )
+      ) {
+        throw new Error(
+          "game/streamer-not-on-board",
+        );
+      }
+
+      transaction.update(gameReference, {
+        pendingGuess: {
+          authorId: userId,
+          streamerId,
+          createdAt: new Date().toISOString(),
+        },
+
+        updatedAt: serverTimestamp(),
+      });
+    },
+  );
+}
+
+export async function resolveFinalGuess({
+  roomId,
+  userId,
+  isCorrect,
+}) {
+  const normalizedRoomId =
+    normalizeRoomId(roomId);
+
+  const gameReference = doc(
+    db,
+    "games",
+    normalizedRoomId,
+  );
+
+  await runTransaction(
+    db,
+    async (transaction) => {
+      const gameSnapshot =
+        await transaction.get(gameReference);
+
+      if (!gameSnapshot.exists()) {
+        throw new Error("game/not-found");
+      }
+
+      const gameData = gameSnapshot.data();
+      const pendingGuess =
+        gameData.pendingGuess;
+
+      if (gameData.status !== "playing") {
+        throw new Error("game/not-playing");
+      }
+
+      if (!pendingGuess) {
+        throw new Error(
+          "game/no-pending-guess",
+        );
+      }
+
+      if (
+        !gameData.playerIds?.includes(userId)
+      ) {
+        throw new Error("game/unauthorized");
+      }
+
+      if (pendingGuess.authorId === userId) {
+        throw new Error(
+          "game/cannot-resolve-own-guess",
+        );
+      }
+
+      const guessingPlayerId =
+        pendingGuess.authorId;
+
+      const opponentId =
+        gameData.playerIds.find(
+          (playerId) =>
+            playerId !== guessingPlayerId,
+        );
+
+      if (!opponentId) {
+        throw new Error(
+          "game/opponent-not-found",
+        );
+      }
+
+      if (isCorrect) {
+        transaction.update(gameReference, {
+          status: "finished",
+
+          winnerId: guessingPlayerId,
+          loserId: opponentId,
+
+          winningStreamerId:
+            pendingGuess.streamerId,
+
+          pendingGuess: null,
+
+          finishedAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+
+        return;
+      }
+
+      transaction.update(gameReference, {
+        currentTurn: opponentId,
+
+        turnNumber:
+          (gameData.turnNumber || 1) + 1,
+
+        pendingGuess: null,
+
+        updatedAt: serverTimestamp(),
+      });
+    },
+  );
+}
