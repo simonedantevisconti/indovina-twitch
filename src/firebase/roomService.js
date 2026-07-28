@@ -398,11 +398,11 @@ export async function startRoom({
 
         boardStreamerIds,
 
-currentTurn: randomStartingPlayer,
-turnNumber: 1,
-pendingQuestionId: null,
-pendingGuess: null,
-status: "playing",
+        currentTurn: randomStartingPlayer,
+        turnNumber: 1,
+        pendingQuestionId: null,
+        pendingGuess: null,
+        status: "playing",
 
         winnerId: null,
         loserId: null,
