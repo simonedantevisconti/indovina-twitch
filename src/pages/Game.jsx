@@ -166,6 +166,14 @@ export default function Game() {
     ? boardStreamers.find((streamer) => streamer.id === selectedGuessId)
     : null;
 
+  const isGameFinished = game?.status === "finished";
+
+  const isWinner = game?.winnerId === currentUser.uid;
+
+  const winningStreamer = game?.winningStreamerId
+    ? streamers.find((streamer) => streamer.id === game.winningStreamerId)
+    : null;
+
   const availableGuessStreamers = boardStreamers.filter(
     (streamer) => !eliminatedStreamerIds.includes(streamer.id),
   );
@@ -416,6 +424,96 @@ export default function Game() {
 
   if (!game?.playerIds?.includes(currentUser.uid)) {
     return <Navigate to="/unauthorized" replace />;
+  }
+
+  if (isGameFinished) {
+    const winnerName = getPlayerName(game.winnerId);
+
+    return (
+      <section className="game-page">
+        <div className="container game-container py-5">
+          <div className="card bg-dark border-secondary text-center">
+            <div className="card-body p-4 p-md-5">
+              <p className="section-eyebrow">Partita conclusa</p>
+
+              <h1 className="mb-3">{isWinner ? "Hai vinto!" : "Hai perso"}</h1>
+
+              <p className="lead mb-4">
+                {isWinner ? (
+                  <>
+                    Hai indovinato correttamente il personaggio del tuo
+                    avversario.
+                  </>
+                ) : (
+                  <>
+                    <strong>{winnerName}</strong> ha indovinato il tuo
+                    personaggio.
+                  </>
+                )}
+              </p>
+
+              {winningStreamer && (
+                <div className="d-flex flex-column align-items-center gap-3 mb-4">
+                  <img
+                    src={winningStreamer.image}
+                    alt={winningStreamer.name}
+                    width="180"
+                    height="180"
+                    className="rounded object-fit-cover"
+                  />
+
+                  <div>
+                    <span className="d-block text-secondary">
+                      Personaggio indovinato
+                    </span>
+
+                    <strong className="fs-3">{winningStreamer.name}</strong>
+
+                    <small className="d-block text-secondary">
+                      @{winningStreamer.twitchUsername}
+                    </small>
+                  </div>
+                </div>
+              )}
+
+              <div className="d-flex justify-content-center flex-wrap gap-3">
+                <Link className="btn button-primary" to="/">
+                  Torna alla homepage
+                </Link>
+
+                <button
+                  className="btn button-secondary"
+                  type="button"
+                  onClick={() => window.location.reload()}
+                >
+                  Rivedi il risultato
+                </button>
+              </div>
+
+              <div className="game-status mt-5">
+                <div className="game-status__item">
+                  <span>Vincitore</span>
+
+                  <strong>{winnerName}</strong>
+                </div>
+
+                <div className="game-status__item">
+                  <span>Turni giocati</span>
+
+                  <strong>{game.turnNumber || 1}</strong>
+                </div>
+
+                <div className="game-status__item">
+                  <span>Stanza</span>
+
+                  <strong>{roomId}</strong>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    );
   }
 
   return (
