@@ -126,16 +126,32 @@ export default function Game() {
         .filter(Boolean)
     : [];
 
-  const secretStreamer = privateState?.secretStreamerId
-    ? streamers.find(
-        (streamer) => streamer.id === privateState.secretStreamerId,
-      )
-    : null;
+  const isPrivateStateCurrentRound =
+    privateState?.roundNumber === (game?.roundNumber || 1);
 
-  const eliminatedStreamerIds = useMemo(
-    () => privateState?.eliminatedStreamerIds || [],
-    [privateState?.eliminatedStreamerIds],
-  );
+  const secretStreamer =
+    isPrivateStateCurrentRound && privateState?.secretStreamerId
+      ? streamers.find(
+          (streamer) => streamer.id === privateState.secretStreamerId,
+        )
+      : null;
+
+  const eliminatedStreamerIds = useMemo(() => {
+    if (!isPrivateStateCurrentRound) {
+      return [];
+    }
+
+    return privateState?.eliminatedStreamerIds || [];
+  }, [isPrivateStateCurrentRound, privateState?.eliminatedStreamerIds]);
+
+  const currentRoundQuestions = useMemo(() => {
+    const currentRoundNumber = game?.roundNumber || 1;
+
+    return questions.filter(
+      (question) => (question.roundNumber || 1) === currentRoundNumber,
+    );
+  }, [questions, game?.roundNumber]);
+
   const availableStreamersCount =
     boardStreamers.length - eliminatedStreamerIds.length;
 
@@ -147,7 +163,9 @@ export default function Game() {
       : game?.players?.host;
 
   const pendingQuestion = game?.pendingQuestionId
-    ? questions.find((question) => question.id === game.pendingQuestionId)
+    ? currentRoundQuestions.find(
+        (question) => question.id === game.pendingQuestionId,
+      )
     : null;
 
   const pendingGuess = game?.pendingGuess || null;
@@ -170,11 +188,11 @@ export default function Game() {
     ? boardStreamers.find((streamer) => streamer.id === selectedGuessId)
     : null;
 
-  const currentPlayerQuestions = questions.filter(
+  const currentPlayerQuestions = currentRoundQuestions.filter(
     (question) => question.authorId === currentUser.uid,
   ).length;
 
-  const opponentQuestions = questions.filter(
+  const opponentQuestions = currentRoundQuestions.filter(
     (question) => question.authorId !== currentUser.uid,
   ).length;
 
@@ -636,7 +654,7 @@ export default function Game() {
                 <div className="game-status__item">
                   <span>Domande totali</span>
 
-                  <strong>{questions.length}</strong>
+                  <strong>{currentRoundQuestions.length}</strong>
                 </div>
               </div>
 
@@ -905,13 +923,13 @@ export default function Game() {
           </div>
         </section>
 
-        {(questions.length > 0 || guessHistory.length > 0) && (
+        {(currentRoundQuestions.length > 0 || guessHistory.length > 0) && (
           <section className="card bg-dark border-secondary mb-4">
             <div className="card-body">
               <p className="section-eyebrow">Storico della partita</p>
 
               <div className="d-flex flex-column gap-3">
-                {questions.map((question) => (
+                {currentRoundQuestions.map((question) => (
                   <article
                     className="border border-secondary rounded p-3"
                     key={question.id}
