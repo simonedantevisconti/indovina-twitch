@@ -7,6 +7,7 @@ import { useAuth } from "../context/AuthContext";
 import {
   answerQuestion,
   createPrivateGameState,
+  requestRematch,
   resetEliminatedStreamers,
   resolveFinalGuess,
   submitFinalGuess,
@@ -183,6 +184,18 @@ export default function Game() {
   ).length;
 
   const isGameFinished = game?.status === "finished";
+
+  const rematchReadyIds = game?.rematchReadyIds || [];
+
+  const currentPlayerWantsRematch = rematchReadyIds.includes(currentUser.uid);
+
+  const opponentWantsRematch = opponent?.uid
+    ? rematchReadyIds.includes(opponent.uid)
+    : false;
+
+  const bothPlayersWantRematch =
+    game?.playerIds?.length === 2 &&
+    game.playerIds.every((playerId) => rematchReadyIds.includes(playerId));
 
   const isWinner = game?.winnerId === currentUser.uid;
 
@@ -423,6 +436,39 @@ export default function Game() {
     });
   }, [game?.lastRejectedGuess, eliminatedStreamerIds, roomId, currentUser.uid]);
 
+  const handleRequestRematch = async () => {
+    if (currentPlayerWantsRematch) {
+      return;
+    }
+
+    try {
+      setActionLoading(true);
+      setError("");
+
+      await requestRematch({
+        roomId,
+        userId: currentUser.uid,
+      });
+    } catch (currentError) {
+      console.error("Errore richiesta rivincita:", currentError);
+
+      switch (currentError.message) {
+        case "game/not-finished":
+          setError("La partita non è ancora terminata.");
+          break;
+
+        case "game/unauthorized":
+          setError("Non puoi richiedere la rivincita.");
+          break;
+
+        default:
+          setError("Non è stato possibile richiedere la rivincita.");
+      }
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   if (gameLoading) {
     return (
       <section className="game-loading">
@@ -500,11 +546,35 @@ export default function Game() {
                 <button
                   className="btn button-secondary"
                   type="button"
-                  onClick={() => window.location.reload()}
+                  disabled={actionLoading || currentPlayerWantsRematch}
+                  onClick={handleRequestRematch}
                 >
-                  Rivedi il risultato
+                  {currentPlayerWantsRematch
+                    ? "Rivincita richiesta"
+                    : "Gioca ancora"}
                 </button>
               </div>
+
+              {currentPlayerWantsRematch && !opponentWantsRematch && (
+                <div className="alert alert-info mt-4 mb-0">
+                  Hai richiesto la rivincita. Attendi la conferma di{" "}
+                  <strong>{opponent?.username || "avversario"}</strong>.
+                </div>
+              )}
+
+              {!currentPlayerWantsRematch && opponentWantsRematch && (
+                <div className="alert alert-warning mt-4 mb-0">
+                  <strong>{opponent?.username || "L’avversario"}</strong> vuole
+                  giocare ancora.
+                </div>
+              )}
+
+              {bothPlayersWantRematch && (
+                <div className="alert alert-success mt-4 mb-0">
+                  Entrambi avete accettato la rivincita. Preparazione della
+                  nuova partita...
+                </div>
+              )}
 
               <div className="game-status mt-5">
                 <div className="game-status__item">
