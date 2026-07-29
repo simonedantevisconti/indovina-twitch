@@ -260,6 +260,7 @@ export async function submitQuestion({ roomId, userId, text }) {
       status: "pending",
 
       turnNumber: gameData.turnNumber || 1,
+      roundNumber: gameData.roundNumber || 1,
 
       createdAt: serverTimestamp(),
       answeredAt: null,
@@ -447,6 +448,7 @@ export async function resolveFinalGuess({ roomId, userId, isCorrect }) {
         winningStreamerId: pendingGuess.streamerId,
 
         pendingGuess: null,
+        rematchReadyIds: [],
 
         finishedAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -459,6 +461,7 @@ export async function resolveFinalGuess({ roomId, userId, isCorrect }) {
       playerId: guessingPlayerId,
       streamerId: pendingGuess.streamerId,
       turnNumber: gameData.turnNumber || 1,
+      roundNumber: gameData.roundNumber || 1,
       resolvedAt: new Date().toISOString(),
     };
 
@@ -470,10 +473,48 @@ export async function resolveFinalGuess({ roomId, userId, isCorrect }) {
       turnNumber: (gameData.turnNumber || 1) + 1,
 
       lastRejectedGuess: rejectedGuess,
+
       guessHistory,
 
       pendingGuess: null,
 
+      updatedAt: serverTimestamp(),
+    });
+  });
+}
+
+export async function requestRematch({ roomId, userId }) {
+  const normalizedRoomId = normalizeRoomId(roomId);
+
+  const gameReference = doc(db, "games", normalizedRoomId);
+
+  await runTransaction(db, async (transaction) => {
+    const gameSnapshot = await transaction.get(gameReference);
+
+    if (!gameSnapshot.exists()) {
+      throw new Error("game/not-found");
+    }
+
+    const gameData = gameSnapshot.data();
+
+    if (gameData.status !== "finished") {
+      throw new Error("game/not-finished");
+    }
+
+    if (!gameData.playerIds?.includes(userId)) {
+      throw new Error("game/unauthorized");
+    }
+
+    const currentReadyIds = gameData.rematchReadyIds || [];
+
+    if (currentReadyIds.includes(userId)) {
+      return;
+    }
+
+    const nextReadyIds = [...currentReadyIds, userId];
+
+    transaction.update(gameReference, {
+      rematchReadyIds: nextReadyIds,
       updatedAt: serverTimestamp(),
     });
   });

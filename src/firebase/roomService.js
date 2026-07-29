@@ -365,9 +365,15 @@ export async function startRoom({ roomId, userId, boardStreamerIds }) {
 
       currentTurn: randomStartingPlayer,
       turnNumber: 1,
+      roundNumber: 1,
+
       pendingQuestionId: null,
       pendingGuess: null,
+
       guessHistory: [],
+      lastRejectedGuess: null,
+      rematchReadyIds: [],
+
       status: "playing",
 
       winnerId: null,
