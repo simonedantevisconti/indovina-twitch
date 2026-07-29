@@ -166,6 +166,22 @@ export default function Game() {
     ? boardStreamers.find((streamer) => streamer.id === selectedGuessId)
     : null;
 
+  const currentPlayerQuestions = questions.filter(
+    (question) => question.authorId === currentUser.uid,
+  ).length;
+
+  const opponentQuestions = questions.filter(
+    (question) => question.authorId !== currentUser.uid,
+  ).length;
+
+  const currentPlayerWrongGuesses = guessHistory.filter(
+    (guess) => guess.playerId === currentUser.uid,
+  ).length;
+
+  const opponentWrongGuesses = guessHistory.filter(
+    (guess) => guess.playerId !== currentUser.uid,
+  ).length;
+
   const isGameFinished = game?.status === "finished";
 
   const isWinner = game?.winnerId === currentUser.uid;
@@ -504,11 +520,55 @@ export default function Game() {
                 </div>
 
                 <div className="game-status__item">
-                  <span>Stanza</span>
+                  <span>Domande totali</span>
 
-                  <strong>{roomId}</strong>
+                  <strong>{questions.length}</strong>
                 </div>
               </div>
+
+              <div className="row g-3 mt-3 text-start">
+                <div className="col-12 col-md-6">
+                  <div className="border border-secondary rounded p-3 h-100">
+                    <h2 className="h5 mb-3">Le tue statistiche</h2>
+
+                    <div className="d-flex justify-content-between gap-3 mb-2">
+                      <span>Domande effettuate</span>
+
+                      <strong>{currentPlayerQuestions}</strong>
+                    </div>
+
+                    <div className="d-flex justify-content-between gap-3">
+                      <span>Tentativi sbagliati</span>
+
+                      <strong>{currentPlayerWrongGuesses}</strong>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="col-12 col-md-6">
+                  <div className="border border-secondary rounded p-3 h-100">
+                    <h2 className="h5 mb-3">
+                      {opponent?.username || "Avversario"}
+                    </h2>
+
+                    <div className="d-flex justify-content-between gap-3 mb-2">
+                      <span>Domande effettuate</span>
+
+                      <strong>{opponentQuestions}</strong>
+                    </div>
+
+                    <div className="d-flex justify-content-between gap-3">
+                      <span>Tentativi sbagliati</span>
+
+                      <strong>{opponentWrongGuesses}</strong>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <p className="text-secondary mt-4 mb-0">
+                Codice stanza: <strong>{roomId}</strong>
+              </p>
             </div>
           </div>
         </div>
