@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
 
 import StreamerCard from "../components/StreamerCard";
@@ -43,6 +43,7 @@ export default function Game() {
   const [gameMissing, setGameMissing] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState("");
+  const processedRejectedGuessRef = useRef(null);
 
   useEffect(() => {
     const unsubscribe = subscribeToGame({
@@ -127,7 +128,10 @@ export default function Game() {
       )
     : null;
 
-  const eliminatedStreamerIds = privateState?.eliminatedStreamerIds || [];
+  const eliminatedStreamerIds = useMemo(
+    () => privateState?.eliminatedStreamerIds || [],
+    [privateState?.eliminatedStreamerIds],
+  );
   const availableStreamersCount =
     boardStreamers.length - eliminatedStreamerIds.length;
 
@@ -160,6 +164,10 @@ export default function Game() {
   const selectedGuessStreamer = selectedGuessId
     ? boardStreamers.find((streamer) => streamer.id === selectedGuessId)
     : null;
+
+  const availableGuessStreamers = boardStreamers.filter(
+    (streamer) => !eliminatedStreamerIds.includes(streamer.id),
+  );
 
   const canSubmitQuestion =
     isCurrentPlayerTurn &&
@@ -351,6 +359,45 @@ export default function Game() {
     }
   };
 
+  useEffect(() => {
+    const rejectedGuess = game?.lastRejectedGuess;
+
+    if (!rejectedGuess || rejectedGuess.playerId !== currentUser.uid) {
+      return;
+    }
+
+    const rejectedGuessKey = [
+      rejectedGuess.playerId,
+      rejectedGuess.streamerId,
+      rejectedGuess.resolvedAt,
+    ].join("-");
+
+    if (processedRejectedGuessRef.current === rejectedGuessKey) {
+      return;
+    }
+
+    if (eliminatedStreamerIds.includes(rejectedGuess.streamerId)) {
+      processedRejectedGuessRef.current = rejectedGuessKey;
+      return;
+    }
+
+    processedRejectedGuessRef.current = rejectedGuessKey;
+
+    toggleEliminatedStreamer({
+      roomId,
+      userId: currentUser.uid,
+      streamerId: rejectedGuess.streamerId,
+    }).catch((currentError) => {
+      console.error("Errore eliminazione tentativo sbagliato:", currentError);
+
+      processedRejectedGuessRef.current = null;
+
+      setError(
+        "Il tentativo era sbagliato, ma non è stato possibile eliminare automaticamente lo streamer.",
+      );
+    });
+  }, [game?.lastRejectedGuess, eliminatedStreamerIds, roomId, currentUser.uid]);
+
   if (gameLoading) {
     return (
       <section className="game-loading">
@@ -530,14 +577,15 @@ export default function Game() {
               </form>
             )}
 
-            {pendingQuestion && pendingQuestion.authorId === currentUser.uid && (
-              <div className="alert alert-info mb-0">
-                <strong>Domanda inviata:</strong> {pendingQuestion.text}
-                <div className="mt-2">
-                  In attesa della risposta dell’avversario...
+            {pendingQuestion &&
+              pendingQuestion.authorId === currentUser.uid && (
+                <div className="alert alert-info mb-0">
+                  <strong>Domanda inviata:</strong> {pendingQuestion.text}
+                  <div className="mt-2">
+                    In attesa della risposta dell’avversario...
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
             {canAnswerQuestion && (
               <div>
@@ -686,12 +734,11 @@ export default function Game() {
                     className="form-select"
                     value={selectedGuessId}
                     disabled={actionLoading}
-                    onChange={(event) =>
-                      setSelectedGuessId(event.target.value)
-                    }
+                    onChange={(event) => setSelectedGuessId(event.target.value)}
                   >
                     <option value="">Seleziona uno streamer</option>
-                    {boardStreamers.map((streamer) => (
+
+                    {availableGuessStreamers.map((streamer) => (
                       <option key={streamer.id} value={streamer.id}>
                         {streamer.name}
                       </option>
