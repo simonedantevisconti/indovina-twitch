@@ -73,6 +73,7 @@ export async function createPrivateGameState({
   roomId,
   userId,
   boardStreamerIds,
+  roundNumber = 1,
 }) {
   const normalizedRoomId = normalizeRoomId(roomId);
 
@@ -90,15 +91,18 @@ export async function createPrivateGameState({
 
   const privateSnapshot = await getDoc(privateReference);
 
-  /*
-   * Evita di cambiare personaggio segreto
-   * ricaricando la pagina.
-   */
   if (privateSnapshot.exists()) {
-    return {
-      id: privateSnapshot.id,
-      ...privateSnapshot.data(),
-    };
+    const privateData = privateSnapshot.data();
+
+    const privateRoundNumber = privateData.roundNumber || 1;
+
+    if (privateRoundNumber === roundNumber) {
+      return {
+        id: privateSnapshot.id,
+        ...privateData,
+        roundNumber: privateRoundNumber,
+      };
+    }
   }
 
   const randomIndex = Math.floor(Math.random() * boardStreamerIds.length);
@@ -107,13 +111,19 @@ export async function createPrivateGameState({
 
   const privateState = {
     userId,
+    roundNumber,
     secretStreamerId,
     eliminatedStreamerIds: [],
-    createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   };
 
-  await setDoc(privateReference, privateState);
+  if (!privateSnapshot.exists()) {
+    privateState.createdAt = serverTimestamp();
+  }
+
+  await setDoc(privateReference, privateState, {
+    merge: true,
+  });
 
   return privateState;
 }
@@ -515,6 +525,79 @@ export async function requestRematch({ roomId, userId }) {
 
     transaction.update(gameReference, {
       rematchReadyIds: nextReadyIds,
+      updatedAt: serverTimestamp(),
+    });
+  });
+}
+
+export async function startRematch({ roomId, userId, boardStreamerIds }) {
+  const normalizedRoomId = normalizeRoomId(roomId);
+
+  if (!Array.isArray(boardStreamerIds) || boardStreamerIds.length < 2) {
+    throw new Error("game/invalid-streamer-board");
+  }
+
+  const gameReference = doc(db, "games", normalizedRoomId);
+
+  await runTransaction(db, async (transaction) => {
+    const gameSnapshot = await transaction.get(gameReference);
+
+    if (!gameSnapshot.exists()) {
+      throw new Error("game/not-found");
+    }
+
+    const gameData = gameSnapshot.data();
+
+    const playerIds = gameData.playerIds || [];
+
+    const rematchReadyIds = gameData.rematchReadyIds || [];
+
+    if (gameData.status !== "finished") {
+      throw new Error("game/not-finished");
+    }
+
+    if (gameData.players?.host?.uid !== userId) {
+      throw new Error("game/host-only");
+    }
+
+    if (playerIds.length !== 2) {
+      throw new Error("game/invalid-players");
+    }
+
+    const bothPlayersAreReady = playerIds.every((playerId) =>
+      rematchReadyIds.includes(playerId),
+    );
+
+    if (!bothPlayersAreReady) {
+      throw new Error("game/rematch-not-ready");
+    }
+
+    const randomStartingPlayer =
+      playerIds[Math.floor(Math.random() * playerIds.length)];
+
+    transaction.update(gameReference, {
+      boardStreamerIds,
+
+      currentTurn: randomStartingPlayer,
+
+      turnNumber: 1,
+
+      roundNumber: (gameData.roundNumber || 1) + 1,
+
+      pendingQuestionId: null,
+      pendingGuess: null,
+
+      guessHistory: [],
+      lastRejectedGuess: null,
+      rematchReadyIds: [],
+
+      status: "playing",
+
+      winnerId: null,
+      loserId: null,
+      winningStreamerId: null,
+
+      finishedAt: null,
       updatedAt: serverTimestamp(),
     });
   });

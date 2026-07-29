@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
-
+import shuffleArray from "../utils/shuffleArray";
 import StreamerCard from "../components/StreamerCard";
 import { useAuth } from "../context/AuthContext";
 
@@ -10,6 +10,7 @@ import {
   requestRematch,
   resetEliminatedStreamers,
   resolveFinalGuess,
+  startRematch,
   submitFinalGuess,
   submitQuestion,
   subscribeToGame,
@@ -19,7 +20,6 @@ import {
 } from "../firebase/gameService";
 
 import streamers from "../data/streamers";
-
 import "../styles/game.css";
 
 const answerLabels = {
@@ -44,7 +44,9 @@ export default function Game() {
   const [gameMissing, setGameMissing] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState("");
+
   const processedRejectedGuessRef = useRef(null);
+  const rematchStartingRef = useRef(false);
 
   useEffect(() => {
     const unsubscribe = subscribeToGame({
@@ -70,6 +72,7 @@ export default function Game() {
             roomId,
             userId: currentUser.uid,
             boardStreamerIds: gameData.boardStreamerIds,
+            roundNumber: gameData.roundNumber || 1,
           });
         } catch (currentError) {
           console.error("Errore creazione stato privato:", currentError);
@@ -468,6 +471,47 @@ export default function Game() {
       setActionLoading(false);
     }
   };
+
+  useEffect(() => {
+    const isHost = game?.players?.host?.uid === currentUser.uid;
+
+    if (
+      !bothPlayersWantRematch ||
+      !isHost ||
+      game?.status !== "finished" ||
+      rematchStartingRef.current
+    ) {
+      return;
+    }
+
+    rematchStartingRef.current = true;
+
+    const activeStreamers = streamers.filter(
+      (streamer) => streamer.active !== false,
+    );
+
+    const nextBoardStreamerIds = shuffleArray(activeStreamers)
+      .slice(0, 24)
+      .map((streamer) => streamer.id);
+
+    startRematch({
+      roomId,
+      userId: currentUser.uid,
+      boardStreamerIds: nextBoardStreamerIds,
+    }).catch((currentError) => {
+      console.error("Errore avvio rivincita:", currentError);
+
+      rematchStartingRef.current = false;
+
+      setError("Non è stato possibile avviare la rivincita.");
+    });
+  }, [
+    bothPlayersWantRematch,
+    game?.status,
+    game?.players?.host?.uid,
+    roomId,
+    currentUser.uid,
+  ]);
 
   if (gameLoading) {
     return (
