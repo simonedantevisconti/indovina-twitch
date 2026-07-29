@@ -455,16 +455,22 @@ export async function resolveFinalGuess({ roomId, userId, isCorrect }) {
       return;
     }
 
+    const rejectedGuess = {
+      playerId: guessingPlayerId,
+      streamerId: pendingGuess.streamerId,
+      turnNumber: gameData.turnNumber || 1,
+      resolvedAt: new Date().toISOString(),
+    };
+
+    const guessHistory = [...(gameData.guessHistory || []), rejectedGuess];
+
     transaction.update(gameReference, {
       currentTurn: opponentId,
 
       turnNumber: (gameData.turnNumber || 1) + 1,
 
-      lastRejectedGuess: {
-        playerId: guessingPlayerId,
-        streamerId: pendingGuess.streamerId,
-        resolvedAt: new Date().toISOString(),
-      },
+      lastRejectedGuess: rejectedGuess,
+      guessHistory,
 
       pendingGuess: null,
 

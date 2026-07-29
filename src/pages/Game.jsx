@@ -147,6 +147,7 @@ export default function Game() {
     : null;
 
   const pendingGuess = game?.pendingGuess || null;
+  const guessHistory = game?.guessHistory || [];
 
   const canSubmitFinalGuess =
     isCurrentPlayerTurn &&
@@ -632,7 +633,7 @@ export default function Game() {
           </div>
         </section>
 
-        {questions.length > 0 && (
+        {(questions.length > 0 || guessHistory.length > 0) && (
           <section className="card bg-dark border-secondary mb-4">
             <div className="card-body">
               <p className="section-eyebrow">Storico della partita</p>
@@ -665,6 +666,38 @@ export default function Game() {
                     </span>
                   </article>
                 ))}
+                {guessHistory.map((guess, index) => {
+                  const guessedHistoryStreamer = streamers.find(
+                    (streamer) => streamer.id === guess.streamerId,
+                  );
+
+                  return (
+                    <article
+                      className="border border-danger rounded p-3"
+                      key={`${guess.playerId}-${guess.resolvedAt}-${index}`}
+                    >
+                      <div className="d-flex justify-content-between flex-wrap gap-2">
+                        <strong>{getPlayerName(guess.playerId)}</strong>
+
+                        <small className="text-secondary">
+                          Turno {guess.turnNumber}
+                        </small>
+                      </div>
+
+                      <p className="my-2">
+                        Ha provato a indovinare{" "}
+                        <strong>
+                          {guessedHistoryStreamer?.name || "uno streamer"}
+                        </strong>
+                        .
+                      </p>
+
+                      <span className="badge text-bg-danger">
+                        Tentativo sbagliato
+                      </span>
+                    </article>
+                  );
+                })}
               </div>
             </div>
           </section>
