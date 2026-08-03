@@ -602,3 +602,55 @@ export async function startRematch({ roomId, userId, boardStreamerIds }) {
     });
   });
 }
+
+export async function abandonGame({ roomId, userId }) {
+  const normalizedRoomId = normalizeRoomId(roomId);
+
+  const gameReference = doc(db, "games", normalizedRoomId);
+
+  await runTransaction(db, async (transaction) => {
+    const gameSnapshot = await transaction.get(gameReference);
+
+    if (!gameSnapshot.exists()) {
+      throw new Error("game/not-found");
+    }
+
+    const gameData = gameSnapshot.data();
+
+    if (gameData.status !== "playing") {
+      throw new Error("game/not-playing");
+    }
+
+    if (!gameData.playerIds?.includes(userId)) {
+      throw new Error("game/unauthorized");
+    }
+
+    const opponentId = gameData.playerIds.find(
+      (playerId) => playerId !== userId,
+    );
+
+    if (!opponentId) {
+      throw new Error("game/opponent-not-found");
+    }
+
+    transaction.update(gameReference, {
+      status: "finished",
+
+      winnerId: opponentId,
+      loserId: userId,
+
+      finishReason: "abandonment",
+      abandonedBy: userId,
+
+      winningStreamerId: null,
+
+      pendingQuestionId: null,
+      pendingGuess: null,
+
+      rematchReadyIds: [],
+
+      finishedAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+  });
+}

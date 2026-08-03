@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, Navigate, useParams } from "react-router-dom";
+import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
 import shuffleArray from "../utils/shuffleArray";
 import StreamerCard from "../components/StreamerCard";
 import { useAuth } from "../context/AuthContext";
+import ConfirmModal from "../components/ConfirmModal";
 
 import {
   answerQuestion,
@@ -17,6 +18,7 @@ import {
   subscribeToPrivateGameState,
   subscribeToQuestions,
   toggleEliminatedStreamer,
+  abandonGame,
 } from "../firebase/gameService";
 
 import streamers from "../data/streamers";
@@ -30,12 +32,14 @@ const answerLabels = {
 
 export default function Game() {
   const { roomId } = useParams();
+  const navigate = useNavigate();
   const { currentUser } = useAuth();
 
   const [game, setGame] = useState(null);
   const [privateState, setPrivateState] = useState(null);
   const [questions, setQuestions] = useState([]);
 
+  const [showAbandonModal, setShowAbandonModal] = useState(false);
   const [questionText, setQuestionText] = useState("");
   const [selectedGuessId, setSelectedGuessId] = useState("");
   const [showGuessModal, setShowGuessModal] = useState(false);
@@ -205,6 +209,10 @@ export default function Game() {
   ).length;
 
   const isGameFinished = game?.status === "finished";
+
+  const isFinishedByAbandonment = game?.finishReason === "abandonment";
+
+  const currentPlayerAbandoned = game?.abandonedBy === currentUser.uid;
 
   const rematchReadyIds = game?.rematchReadyIds || [];
 
@@ -457,6 +465,38 @@ export default function Game() {
     });
   }, [game?.lastRejectedGuess, eliminatedStreamerIds, roomId, currentUser.uid]);
 
+  const handleAbandonGame = async () => {
+    try {
+      setActionLoading(true);
+      setError("");
+
+      await abandonGame({
+        roomId,
+        userId: currentUser.uid,
+      });
+
+      setShowAbandonModal(false);
+      navigate("/");
+    } catch (currentError) {
+      console.error("Errore abbandono partita:", currentError);
+
+      switch (currentError.message) {
+        case "game/not-playing":
+          setError("La partita è già terminata.");
+          break;
+
+        case "game/unauthorized":
+          setError("Non puoi abbandonare questa partita.");
+          break;
+
+        default:
+          setError("Non è stato possibile abbandonare la partita.");
+      }
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const handleRequestRematch = async () => {
     if (currentPlayerWantsRematch) {
       return;
@@ -560,10 +600,27 @@ export default function Game() {
             <div className="card-body p-4 p-md-5">
               <p className="section-eyebrow">Partita conclusa</p>
 
-              <h1 className="mb-3">{isWinner ? "Hai vinto!" : "Hai perso"}</h1>
+              <h1 className="mb-3">
+                {isFinishedByAbandonment
+                  ? currentPlayerAbandoned
+                    ? "Hai abbandonato la partita"
+                    : "Hai vinto!"
+                  : isWinner
+                    ? "Hai vinto!"
+                    : "Hai perso"}
+              </h1>
 
               <p className="lead mb-4">
-                {isWinner ? (
+                {isFinishedByAbandonment ? (
+                  currentPlayerAbandoned ? (
+                    <>
+                      Hai lasciato la partita. <strong>{winnerName}</strong> è
+                      stato dichiarato vincitore.
+                    </>
+                  ) : (
+                    <>Il tuo avversario ha abbandonato la partita. Hai vinto.</>
+                  )
+                ) : isWinner ? (
                   <>
                     Hai indovinato correttamente il personaggio del tuo
                     avversario.
@@ -576,7 +633,7 @@ export default function Game() {
                 )}
               </p>
 
-              {winningStreamer && (
+              {!isFinishedByAbandonment && winningStreamer && (
                 <div className="d-flex flex-column align-items-center gap-3 mb-4">
                   <img
                     src={winningStreamer.image}
@@ -739,9 +796,14 @@ export default function Game() {
               Ripristina griglia
             </button>
 
-            <Link className="btn btn-outline-danger" to="/">
+            <button
+              className="btn btn-outline-danger"
+              type="button"
+              disabled={actionLoading}
+              onClick={() => setShowAbandonModal(true)}
+            >
               Abbandona
-            </Link>
+            </button>
           </div>
         </header>
 
@@ -1117,6 +1179,21 @@ export default function Game() {
           <div className="modal-backdrop show" />
         </>
       )}
+
+      <ConfirmModal
+        isOpen={showAbandonModal}
+        title="Abbandonare la partita?"
+        message="Vuoi davvero abbandonare la partita? Il tuo avversario verrà dichiarato vincitore."
+        confirmLabel="Abbandona partita"
+        cancelLabel="Continua a giocare"
+        isLoading={actionLoading}
+        onConfirm={handleAbandonGame}
+        onCancel={() => {
+          if (!actionLoading) {
+            setShowAbandonModal(false);
+          }
+        }}
+      />
     </section>
   );
 }
