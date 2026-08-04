@@ -4,6 +4,8 @@ import DefaultLayout from "./layouts/DefaultLayout";
 
 import ProtectedRoute from "./components/ProtectedRoute";
 import PublicRoute from "./components/PublicRoute";
+import ErrorBoundary from "./components/ErrorBoundary";
+import ServerError from "./pages/ServerError";
 
 import Homepage from "./pages/Homepage";
 import Login from "./pages/Login";
@@ -20,91 +22,95 @@ import NotFound from "./pages/NotFound";
 
 function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route element={<DefaultLayout />}>
-          <Route path="/" element={<Homepage />} />
+    <ErrorBoundary>
+      <BrowserRouter>
+        <Routes>
+          <Route element={<DefaultLayout />}>
+            <Route path="/" element={<Homepage />} />
 
-          <Route
-            path="/login"
-            element={
-              <PublicRoute>
-                <Login />
-              </PublicRoute>
-            }
-          />
+            <Route
+              path="/login"
+              element={
+                <PublicRoute>
+                  <Login />
+                </PublicRoute>
+              }
+            />
 
-          <Route
-            path="/register"
-            element={
-              <PublicRoute>
-                <Register />
-              </PublicRoute>
-            }
-          />
+            <Route
+              path="/register"
+              element={
+                <PublicRoute>
+                  <Register />
+                </PublicRoute>
+              }
+            />
 
-          <Route
-            path="/profile"
-            element={
-              <ProtectedRoute>
-                <Profile />
-              </ProtectedRoute>
-            }
-          />
+            <Route
+              path="/profile"
+              element={
+                <ProtectedRoute>
+                  <Profile />
+                </ProtectedRoute>
+              }
+            />
 
-          <Route
-            path="/lobby"
-            element={
-              <ProtectedRoute>
-                <Lobby />
-              </ProtectedRoute>
-            }
-          />
+            <Route
+              path="/lobby"
+              element={
+                <ProtectedRoute>
+                  <Lobby />
+                </ProtectedRoute>
+              }
+            />
 
-          <Route
-            path="/join"
-            element={
-              <ProtectedRoute>
-                <JoinRoom />
-              </ProtectedRoute>
-            }
-          />
+            <Route
+              path="/join"
+              element={
+                <ProtectedRoute>
+                  <JoinRoom />
+                </ProtectedRoute>
+              }
+            />
 
-          <Route
-            path="/rooms"
-            element={
-              <ProtectedRoute>
-                <PublicRooms />
-              </ProtectedRoute>
-            }
-          />
+            <Route
+              path="/rooms"
+              element={
+                <ProtectedRoute>
+                  <PublicRooms />
+                </ProtectedRoute>
+              }
+            />
 
-          <Route
-            path="/room/:roomId"
-            element={
-              <ProtectedRoute>
-                <WaitingRoom />
-              </ProtectedRoute>
-            }
-          />
+            <Route
+              path="/room/:roomId"
+              element={
+                <ProtectedRoute>
+                  <WaitingRoom />
+                </ProtectedRoute>
+              }
+            />
 
-          <Route
-            path="/game/:roomId"
-            element={
-              <ProtectedRoute>
-                <Game />
-              </ProtectedRoute>
-            }
-          />
+            <Route
+              path="/game/:roomId"
+              element={
+                <ProtectedRoute>
+                  <Game />
+                </ProtectedRoute>
+              }
+            />
 
-          <Route path="/room-not-found" element={<RoomNotFound />} />
+            <Route path="/room-not-found" element={<RoomNotFound />} />
 
-          <Route path="/unauthorized" element={<Unauthorized />} />
+            <Route path="/unauthorized" element={<Unauthorized />} />
 
-          <Route path="*" element={<NotFound />} />
-        </Route>
-      </Routes>
-    </BrowserRouter>
+            <Route path="/server-error" element={<ServerError />} />
+
+            <Route path="*" element={<NotFound />} />
+          </Route>
+        </Routes>
+      </BrowserRouter>
+    </ErrorBoundary>
   );
 }
 
