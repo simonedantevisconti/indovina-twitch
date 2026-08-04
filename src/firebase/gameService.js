@@ -660,3 +660,81 @@ export async function abandonGame({ roomId, userId }) {
     });
   });
 }
+
+export async function claimDisconnectionWin({ roomId, userId }) {
+  const normalizedRoomId = normalizeRoomId(roomId);
+
+  const gameReference = doc(db, "games", normalizedRoomId);
+
+  await runTransaction(db, async (transaction) => {
+    const gameSnapshot = await transaction.get(gameReference);
+
+    if (!gameSnapshot.exists()) {
+      throw new Error("game/not-found");
+    }
+
+    const gameData = gameSnapshot.data();
+
+    if (gameData.status !== "playing") {
+      throw new Error("game/not-playing");
+    }
+
+    if (!gameData.playerIds?.includes(userId)) {
+      throw new Error("game/unauthorized");
+    }
+
+    const opponentId = gameData.playerIds.find(
+      (playerId) => playerId !== userId,
+    );
+
+    if (!opponentId) {
+      throw new Error("game/opponent-not-found");
+    }
+
+    const presenceReference = doc(
+      db,
+      "games",
+      normalizedRoomId,
+      "presence",
+      opponentId,
+    );
+
+    const presenceSnapshot = await transaction.get(presenceReference);
+
+    if (!presenceSnapshot.exists()) {
+      throw new Error("game/presence-not-found");
+    }
+
+    const lastSeenAt = presenceSnapshot.data().lastSeenAt?.toMillis?.();
+
+    if (!lastSeenAt) {
+      throw new Error("game/invalid-presence");
+    }
+
+    const disconnectedFor = Date.now() - lastSeenAt;
+
+    if (disconnectedFor < 120_000) {
+      throw new Error("game/disconnection-timeout-not-reached");
+    }
+
+    transaction.update(gameReference, {
+      status: "finished",
+
+      winnerId: userId,
+      loserId: opponentId,
+
+      finishReason: "disconnection",
+      disconnectedPlayerId: opponentId,
+
+      abandonedBy: null,
+      winningStreamerId: null,
+
+      pendingQuestionId: null,
+      pendingGuess: null,
+      rematchReadyIds: [],
+
+      finishedAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+  });
+}

@@ -23,6 +23,7 @@ import {
   subscribeToQuestions,
   toggleEliminatedStreamer,
   abandonGame,
+  claimDisconnectionWin,
 } from "../firebase/gameService";
 
 import streamers from "../data/streamers";
@@ -265,6 +266,20 @@ export default function Game() {
     offline: "Disconnesso",
   }[opponentConnectionStatus];
 
+  const disconnectionTimeout = 120_000;
+
+  const disconnectionTimeRemaining =
+    opponentPresenceAge !== null
+      ? Math.max(disconnectionTimeout - opponentPresenceAge, 0)
+      : disconnectionTimeout;
+
+  const disconnectionSecondsRemaining = Math.ceil(
+    disconnectionTimeRemaining / 1000,
+  );
+
+  const canClaimDisconnectionWin =
+    opponentConnectionStatus === "offline" && disconnectionTimeRemaining === 0;
+
   const pendingQuestion = game?.pendingQuestionId
     ? currentRoundQuestions.find(
         (question) => question.id === game.pendingQuestionId,
@@ -310,6 +325,14 @@ export default function Game() {
   const isGameFinished = game?.status === "finished";
 
   const isFinishedByAbandonment = game?.finishReason === "abandonment";
+
+  const isFinishedByDisconnection = game?.finishReason === "disconnection";
+
+  const currentPlayerDisconnected =
+    game?.disconnectedPlayerId === currentUser.uid;
+
+  const isFinishedWithoutRematch =
+    isFinishedByAbandonment || isFinishedByDisconnection;
 
   const currentPlayerAbandoned = game?.abandonedBy === currentUser.uid;
 
@@ -564,6 +587,49 @@ export default function Game() {
     });
   }, [game?.lastRejectedGuess, eliminatedStreamerIds, roomId, currentUser.uid]);
 
+  const handleClaimDisconnectionWin = async () => {
+    if (!canClaimDisconnectionWin) {
+      return;
+    }
+
+    try {
+      setActionLoading(true);
+      setError("");
+
+      await claimDisconnectionWin({
+        roomId,
+        userId: currentUser.uid,
+      });
+    } catch (currentError) {
+      console.error(
+        "Errore richiesta vittoria per disconnessione:",
+        currentError,
+      );
+
+      switch (currentError.message) {
+        case "game/disconnection-timeout-not-reached":
+          setError("Il tempo di attesa non è ancora terminato.");
+          break;
+
+        case "game/presence-not-found":
+        case "game/invalid-presence":
+          setError(
+            "Non è stato possibile verificare la presenza dell’avversario.",
+          );
+          break;
+
+        case "game/not-playing":
+          setError("La partita è già terminata.");
+          break;
+
+        default:
+          setError("Non è stato possibile richiedere la vittoria.");
+      }
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const handleAbandonGame = async () => {
     try {
       setActionLoading(true);
@@ -726,9 +792,13 @@ export default function Game() {
                   ? currentPlayerAbandoned
                     ? "Hai abbandonato la partita"
                     : "Hai vinto!"
-                  : isWinner
-                    ? "Hai vinto!"
-                    : "Hai perso"}
+                  : isFinishedByDisconnection
+                    ? currentPlayerDisconnected
+                      ? "Hai perso per disconnessione"
+                      : "Hai vinto!"
+                    : isWinner
+                      ? "Hai vinto!"
+                      : "Hai perso"}
               </h1>
 
               <p className="lead mb-4">
@@ -740,6 +810,19 @@ export default function Game() {
                     </>
                   ) : (
                     <>Il tuo avversario ha abbandonato la partita. Hai vinto.</>
+                  )
+                ) : isFinishedByDisconnection ? (
+                  currentPlayerDisconnected ? (
+                    <>
+                      La tua connessione è rimasta assente troppo a lungo.{" "}
+                      <strong>{winnerName}</strong> è stato dichiarato
+                      vincitore.
+                    </>
+                  ) : (
+                    <>
+                      L’avversario è rimasto disconnesso per oltre due minuti.
+                      Hai vinto.
+                    </>
                   )
                 ) : isWinner ? (
                   <>
@@ -754,7 +837,7 @@ export default function Game() {
                 )}
               </p>
 
-              {!isFinishedByAbandonment && winningStreamer && (
+              {!isFinishedWithoutRematch && winningStreamer && (
                 <div className="d-flex flex-column align-items-center gap-3 mb-4">
                   <img
                     src={winningStreamer.image}
@@ -783,7 +866,7 @@ export default function Game() {
                   Torna alla homepage
                 </Link>
 
-                {!isFinishedByAbandonment && (
+                {!isFinishedWithoutRematch && (
                   <button
                     className="btn button-secondary"
                     type="button"
@@ -797,7 +880,7 @@ export default function Game() {
                 )}
               </div>
 
-              {!isFinishedByAbandonment &&
+              {!isFinishedWithoutRematch &&
                 currentPlayerWantsRematch &&
                 !opponentWantsRematch && (
                   <div className="alert alert-info mt-4 mb-0">
@@ -806,7 +889,7 @@ export default function Game() {
                   </div>
                 )}
 
-              {!isFinishedByAbandonment &&
+              {!isFinishedWithoutRematch &&
                 !currentPlayerWantsRematch &&
                 opponentWantsRematch && (
                   <div className="alert alert-warning mt-4 mb-0">
@@ -815,7 +898,7 @@ export default function Game() {
                   </div>
                 )}
 
-              {!isFinishedByAbandonment && bothPlayersWantRematch && (
+              {!isFinishedWithoutRematch && bothPlayersWantRematch && (
                 <div className="alert alert-success mt-4 mb-0">
                   Entrambi avete accettato la rivincita. Preparazione della
                   nuova partita...
@@ -950,8 +1033,75 @@ export default function Game() {
               ? "È il tuo turno"
               : `Turno di ${opponent?.username || "avversario"}`}
           </span>
+
           <strong>Turno {game.turnNumber || 1}</strong>
         </div>
+
+        {opponentConnectionStatus === "unstable" && (
+          <div
+            className="connection-notice connection-notice--unstable"
+            role="status"
+            aria-live="polite"
+          >
+            <div className="connection-notice__icon" aria-hidden="true">
+              !
+            </div>
+
+            <div>
+              <strong>Connessione dell’avversario instabile</strong>
+
+              <p>
+                {opponent?.username || "Il tuo avversario"} non aggiorna la
+                propria presenza da alcuni secondi. La partita rimane attiva.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {opponentConnectionStatus === "offline" && (
+          <div
+            className="connection-notice connection-notice--offline"
+            role="status"
+            aria-live="polite"
+          >
+            <div className="connection-notice__icon" aria-hidden="true">
+              ×
+            </div>
+
+            <div className="connection-notice__content">
+              <strong>Avversario disconnesso</strong>
+
+              {canClaimDisconnectionWin ? (
+                <p>
+                  Il tempo di attesa è terminato. Puoi richiedere la vittoria
+                  per disconnessione.
+                </p>
+              ) : (
+                <p>
+                  {opponent?.username || "Il tuo avversario"} sembra aver perso
+                  la connessione. Attendi ancora{" "}
+                  <strong className="connection-notice__countdown">
+                    {disconnectionSecondsRemaining} secondi
+                  </strong>
+                  .
+                </p>
+              )}
+
+              <button
+                className="btn btn-danger connection-notice__action"
+                type="button"
+                disabled={!canClaimDisconnectionWin || actionLoading}
+                onClick={handleClaimDisconnectionWin}
+              >
+                {actionLoading
+                  ? "Verifica in corso..."
+                  : canClaimDisconnectionWin
+                    ? "Richiedi vittoria"
+                    : `Attendi ${disconnectionSecondsRemaining}s`}
+              </button>
+            </div>
+          </div>
+        )}
 
         {pendingGuess && pendingGuess.authorId === currentUser.uid && (
           <div className="alert alert-info">
