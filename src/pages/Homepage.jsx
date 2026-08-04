@@ -164,6 +164,8 @@ export default function Homepage() {
                 placeholder="Esempio: ABC123"
                 maxLength={12}
                 autoComplete="off"
+                aria-invalid={Boolean(error)}
+                aria-describedby={error ? "roomCodeError" : undefined}
                 onChange={(event) => {
                   setRoomCode(event.target.value);
                   setError("");
@@ -175,7 +177,15 @@ export default function Homepage() {
               </button>
             </div>
 
-            {error && <div className="invalid-feedback d-block">{error}</div>}
+            {error && (
+              <div
+                id="roomCodeError"
+                className="invalid-feedback d-block"
+                role="alert"
+              >
+                {error}
+              </div>
+            )}
           </form>
         </div>
       </section>
