@@ -662,33 +662,39 @@ export default function Game() {
                   Torna alla homepage
                 </Link>
 
-                <button
-                  className="btn button-secondary"
-                  type="button"
-                  disabled={actionLoading || currentPlayerWantsRematch}
-                  onClick={handleRequestRematch}
-                >
-                  {currentPlayerWantsRematch
-                    ? "Rivincita richiesta"
-                    : "Gioca ancora"}
-                </button>
+                {!isFinishedByAbandonment && (
+                  <button
+                    className="btn button-secondary"
+                    type="button"
+                    disabled={actionLoading || currentPlayerWantsRematch}
+                    onClick={handleRequestRematch}
+                  >
+                    {currentPlayerWantsRematch
+                      ? "Rivincita richiesta"
+                      : "Gioca ancora"}
+                  </button>
+                )}
               </div>
 
-              {currentPlayerWantsRematch && !opponentWantsRematch && (
-                <div className="alert alert-info mt-4 mb-0">
-                  Hai richiesto la rivincita. Attendi la conferma di{" "}
-                  <strong>{opponent?.username || "avversario"}</strong>.
-                </div>
-              )}
+              {!isFinishedByAbandonment &&
+                currentPlayerWantsRematch &&
+                !opponentWantsRematch && (
+                  <div className="alert alert-info mt-4 mb-0">
+                    Hai richiesto la rivincita. Attendi la conferma di{" "}
+                    <strong>{opponent?.username || "avversario"}</strong>.
+                  </div>
+                )}
 
-              {!currentPlayerWantsRematch && opponentWantsRematch && (
-                <div className="alert alert-warning mt-4 mb-0">
-                  <strong>{opponent?.username || "L’avversario"}</strong> vuole
-                  giocare ancora.
-                </div>
-              )}
+              {!isFinishedByAbandonment &&
+                !currentPlayerWantsRematch &&
+                opponentWantsRematch && (
+                  <div className="alert alert-warning mt-4 mb-0">
+                    <strong>{opponent?.username || "L’avversario"}</strong>{" "}
+                    vuole giocare ancora.
+                  </div>
+                )}
 
-              {bothPlayersWantRematch && (
+              {!isFinishedByAbandonment && bothPlayersWantRematch && (
                 <div className="alert alert-success mt-4 mb-0">
                   Entrambi avete accettato la rivincita. Preparazione della
                   nuova partita...

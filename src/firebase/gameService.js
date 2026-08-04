@@ -457,6 +457,9 @@ export async function resolveFinalGuess({ roomId, userId, isCorrect }) {
 
         winningStreamerId: pendingGuess.streamerId,
 
+        finishReason: "correct-guess",
+        abandonedBy: null,
+
         pendingGuess: null,
         rematchReadyIds: [],
 
@@ -596,6 +599,9 @@ export async function startRematch({ roomId, userId, boardStreamerIds }) {
       winnerId: null,
       loserId: null,
       winningStreamerId: null,
+
+      finishReason: null,
+      abandonedBy: null,
 
       finishedAt: null,
       updatedAt: serverTimestamp(),
