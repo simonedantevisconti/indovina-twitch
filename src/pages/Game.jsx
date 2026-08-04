@@ -26,6 +26,8 @@ import {
   claimDisconnectionWin,
 } from "../firebase/gameService";
 
+import { recordCompletedMatch } from "../firebase/profileService";
+
 import streamers from "../data/streamers";
 import "../styles/game.css";
 
@@ -58,6 +60,7 @@ export default function Game() {
 
   const processedRejectedGuessRef = useRef(null);
   const rematchStartingRef = useRef(false);
+  const recordedMatchRef = useRef(null);
 
   useEffect(() => {
     const unsubscribe = subscribeToGame({
@@ -370,6 +373,90 @@ export default function Game() {
     game.playerIds.every((playerId) => rematchReadyIds.includes(playerId));
 
   const isWinner = game?.winnerId === currentUser.uid;
+
+  useEffect(() => {
+    if (
+      game?.status !== "finished" ||
+      !game?.winnerId ||
+      !game?.playerIds?.includes(currentUser.uid)
+    ) {
+      return;
+    }
+
+    const roundNumber = game.roundNumber || 1;
+
+    const matchKey = `${roomId}-${roundNumber}-${currentUser.uid}`;
+
+    if (recordedMatchRef.current === matchKey) {
+      return;
+    }
+
+    const opponentId = game.playerIds.find(
+      (playerId) => playerId !== currentUser.uid,
+    );
+
+    if (!opponentId) {
+      console.error(
+        "Registrazione statistiche interrotta: avversario non trovato.",
+      );
+      return;
+    }
+
+    const result = game.winnerId === currentUser.uid ? "win" : "loss";
+
+    recordedMatchRef.current = matchKey;
+
+    recordCompletedMatch({
+      roomId,
+      userId: currentUser.uid,
+
+      opponentId,
+      opponentUsername: opponent?.username || "Avversario",
+
+      result,
+
+      finishReason: game.finishReason || null,
+
+      roundNumber,
+
+      turnNumber: game.turnNumber || 1,
+
+      winningStreamerId: game.winningStreamerId || null,
+    })
+      .then(() => {
+        console.log("Statistiche registrate correttamente:", {
+          roomId,
+          roundNumber,
+          userId: currentUser.uid,
+          result,
+        });
+      })
+      .catch((currentError) => {
+        console.error(
+          "Errore registrazione statistiche:",
+          currentError.code,
+          currentError.message,
+          currentError,
+        );
+
+        recordedMatchRef.current = null;
+
+        setError(
+          "La partita è terminata, ma non è stato possibile aggiornare le statistiche.",
+        );
+      });
+  }, [
+    roomId,
+    game?.status,
+    game?.winnerId,
+    game?.playerIds,
+    game?.roundNumber,
+    game?.turnNumber,
+    game?.finishReason,
+    game?.winningStreamerId,
+    opponent?.username,
+    currentUser.uid,
+  ]);
 
   const winningStreamer = game?.winningStreamerId
     ? streamers.find((streamer) => streamer.id === game.winningStreamerId)
