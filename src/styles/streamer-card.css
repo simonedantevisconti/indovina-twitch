@@ -92,16 +92,16 @@
 
 .streamer-card--eliminated {
   border-color: var(--color-danger);
-  opacity: 0.42;
+  opacity: 0.48;
   filter: grayscale(1);
-  transform: scale(0.96);
+  transform: scale(0.94) rotate(-1deg);
 }
 
 .streamer-card--eliminated:hover,
 .streamer-card--eliminated:focus-visible {
   border-color: var(--color-danger);
-  opacity: 0.7;
-  transform: scale(0.98);
+  opacity: 0.72;
+  transform: scale(0.97);
 }
 
 .streamer-card--eliminated .streamer-card__image {
@@ -115,6 +115,19 @@
 
 .streamer-card--eliminated .streamer-card__overlay span {
   background-color: var(--color-danger);
+  animation: eliminated-label-enter 220ms ease both;
+}
+
+@keyframes eliminated-label-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 @media (max-width: 575.98px) {
@@ -128,5 +141,16 @@
 
   .streamer-card__content p {
     display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
