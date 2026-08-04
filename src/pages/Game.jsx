@@ -4,6 +4,10 @@ import shuffleArray from "../utils/shuffleArray";
 import StreamerCard from "../components/StreamerCard";
 import { useAuth } from "../context/AuthContext";
 import ConfirmModal from "../components/ConfirmModal";
+import {
+  subscribeToPlayerPresence,
+  updatePlayerPresence,
+} from "../firebase/presenceService";
 
 import {
   answerQuestion,
@@ -38,6 +42,8 @@ export default function Game() {
   const [game, setGame] = useState(null);
   const [privateState, setPrivateState] = useState(null);
   const [questions, setQuestions] = useState([]);
+  const [opponentPresence, setOpponentPresence] = useState(null);
+  const [presenceClock, setPresenceClock] = useState(0);
 
   const [showAbandonModal, setShowAbandonModal] = useState(false);
   const [questionText, setQuestionText] = useState("");
@@ -122,6 +128,24 @@ export default function Game() {
     return unsubscribe;
   }, [roomId]);
 
+  useEffect(() => {
+    if (game?.status !== "playing") {
+      return undefined;
+    }
+
+    const updatePresenceClock = () => {
+      setPresenceClock(Date.now());
+    };
+
+    updatePresenceClock();
+
+    const clockInterval = window.setInterval(updatePresenceClock, 5_000);
+
+    return () => {
+      window.clearInterval(clockInterval);
+    };
+  }, [game?.status]);
+
   const boardStreamers = game?.boardStreamerIds
     ? game.boardStreamerIds
         .map((streamerId) =>
@@ -165,6 +189,81 @@ export default function Game() {
     game?.players?.host?.uid === currentUser.uid
       ? game?.players?.guest
       : game?.players?.host;
+
+  useEffect(() => {
+    if (game?.status !== "playing" || !opponent?.uid) {
+      return undefined;
+    }
+
+    const unsubscribe = subscribeToPlayerPresence({
+      roomId,
+      userId: opponent.uid,
+      onData: (presenceData) => {
+        setOpponentPresence(presenceData);
+      },
+      onError: (currentError) => {
+        console.error("Errore presenza avversario:", currentError);
+      },
+    });
+
+    return unsubscribe;
+  }, [roomId, game?.status, opponent?.uid]);
+
+  useEffect(() => {
+    if (game?.status !== "playing") {
+      return undefined;
+    }
+
+    let isMounted = true;
+
+    const sendHeartbeat = async () => {
+      try {
+        await updatePlayerPresence({
+          roomId,
+          userId: currentUser.uid,
+          status: "online",
+        });
+      } catch (currentError) {
+        if (isMounted) {
+          console.error("Errore aggiornamento presenza:", currentError);
+        }
+      }
+    };
+
+    sendHeartbeat();
+
+    const heartbeatInterval = window.setInterval(sendHeartbeat, 20_000);
+
+    return () => {
+      isMounted = false;
+      window.clearInterval(heartbeatInterval);
+    };
+  }, [roomId, game?.status, currentUser.uid]);
+
+  const opponentLastSeenAt = opponentPresence?.lastSeenAt?.toMillis?.() || null;
+
+  const opponentPresenceAge = opponentLastSeenAt
+    ? presenceClock - opponentLastSeenAt
+    : null;
+
+  let opponentConnectionStatus = "checking";
+
+  if (opponentPresenceAge !== null) {
+    if (opponentPresenceAge <= 35_000) {
+      opponentConnectionStatus = "online";
+    } else if (opponentPresenceAge <= 60_000) {
+      opponentConnectionStatus = "unstable";
+    } else {
+      opponentConnectionStatus = "offline";
+    }
+  }
+
+  const opponentConnectionLabel = {
+    checking: "Connessione in verifica",
+    online: "Online",
+    unstable: "Connessione instabile",
+    offline: "Disconnesso",
+  }[opponentConnectionStatus];
 
   const pendingQuestion = game?.pendingQuestionId
     ? currentRoundQuestions.find(
@@ -571,6 +670,28 @@ export default function Game() {
     currentUser.uid,
   ]);
 
+  useEffect(() => {
+    const shouldProtectPage =
+      game?.status === "playing" && game?.playerIds?.includes(currentUser.uid);
+
+    if (!shouldProtectPage) {
+      return undefined;
+    }
+
+    const handleBeforeUnload = (event) => {
+      event.preventDefault();
+
+      // Necessario per attivare il messaggio di conferma del browser.
+      event.returnValue = "";
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [game?.status, game?.playerIds, currentUser.uid]);
+
   if (gameLoading) {
     return (
       <section className="game-loading">
@@ -894,7 +1015,17 @@ export default function Game() {
 
           <div className="game-opponent-card">
             <span>Il tuo avversario</span>
+
             <strong>{opponent?.username || "Giocatore"}</strong>
+
+            <small
+              className={`opponent-presence opponent-presence--${opponentConnectionStatus}`}
+              aria-live="polite"
+            >
+              <span className="opponent-presence__dot" aria-hidden="true" />
+
+              {opponentConnectionLabel}
+            </small>
           </div>
         </div>
 

@@ -77,9 +77,7 @@
 
 .game-loading {
   display: flex;
-  min-height: calc(
-    100vh - var(--header-height)
-  );
+  min-height: calc(100vh - var(--header-height));
   align-items: center;
   justify-content: center;
   flex-direction: column;
@@ -102,12 +100,7 @@
 
 .turn-banner--active {
   border-color: var(--color-primary);
-  background-color: rgba(
-    145,
-    70,
-    255,
-    0.14
-  );
+  background-color: rgba(145, 70, 255, 0.14);
   color: var(--color-text);
 }
 
@@ -235,6 +228,66 @@
 
 .game-page .badge.text-bg-warning {
   color: #111111 !important;
+}
+
+.opponent-presence {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+
+  margin-top: 0.45rem;
+
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.opponent-presence__dot {
+  width: 9px;
+  height: 9px;
+
+  border-radius: 50%;
+
+  background: currentColor;
+  box-shadow: 0 0 10px currentColor;
+}
+
+.opponent-presence--checking {
+  color: #f6c453;
+}
+
+.opponent-presence--online {
+  color: #48d597;
+}
+
+.opponent-presence--unstable {
+  color: #ffb347;
+}
+
+.opponent-presence--offline {
+  color: #ff6875;
+}
+
+.opponent-presence--online .opponent-presence__dot {
+  animation: presence-pulse 1.8s infinite;
+}
+
+@keyframes presence-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.55;
+    transform: scale(0.8);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .opponent-presence--online .opponent-presence__dot {
+    animation: none;
+  }
 }
 
 @media (max-width: 767.98px) {
