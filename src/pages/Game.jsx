@@ -138,9 +138,7 @@ export default function Game() {
       setPresenceClock(Date.now());
     };
 
-    updatePresenceClock();
-
-    const clockInterval = window.setInterval(updatePresenceClock, 5_000);
+    const clockInterval = window.setInterval(updatePresenceClock, 1_000);
 
     return () => {
       window.clearInterval(clockInterval);
@@ -231,13 +229,31 @@ export default function Game() {
       }
     };
 
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        sendHeartbeat();
+      }
+    };
+
+    const handleWindowFocus = () => {
+      sendHeartbeat();
+    };
+
     sendHeartbeat();
 
     const heartbeatInterval = window.setInterval(sendHeartbeat, 20_000);
 
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("focus", handleWindowFocus);
+
     return () => {
       isMounted = false;
+
       window.clearInterval(heartbeatInterval);
+
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+
+      window.removeEventListener("focus", handleWindowFocus);
     };
   }, [roomId, game?.status, currentUser.uid]);
 
@@ -276,6 +292,11 @@ export default function Game() {
   const disconnectionSecondsRemaining = Math.ceil(
     disconnectionTimeRemaining / 1000,
   );
+
+  const disconnectionCountdownLabel =
+    disconnectionSecondsRemaining === 1
+      ? "1 secondo"
+      : `${disconnectionSecondsRemaining} secondi`;
 
   const canClaimDisconnectionWin =
     opponentConnectionStatus === "offline" && disconnectionTimeRemaining === 0;
@@ -1081,7 +1102,7 @@ export default function Game() {
                   {opponent?.username || "Il tuo avversario"} sembra aver perso
                   la connessione. Attendi ancora{" "}
                   <strong className="connection-notice__countdown">
-                    {disconnectionSecondsRemaining} secondi
+                    {disconnectionCountdownLabel}
                   </strong>
                   .
                 </p>
@@ -1097,7 +1118,7 @@ export default function Game() {
                   ? "Verifica in corso..."
                   : canClaimDisconnectionWin
                     ? "Richiedi vittoria"
-                    : `Attendi ${disconnectionSecondsRemaining}s`}
+                    : `Attendi ${disconnectionCountdownLabel}`}
               </button>
             </div>
           </div>
