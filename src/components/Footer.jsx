@@ -22,8 +22,8 @@ export default function Footer() {
           <nav className="footer__links" aria-label="Link del footer">
             <Link to="/">Homepage</Link>
             <a href="/#how-it-works">Come si gioca</a>
-            <span>Privacy</span>
-            <span>Termini</span>
+            <Link to="/privacy">Privacy</Link>
+            <Link to="/terms">Termini</Link>
           </nav>
         </div>
 

@@ -19,6 +19,8 @@ import Game from "./pages/Game";
 import RoomNotFound from "./pages/RoomNotFound";
 import Unauthorized from "./pages/Unauthorized";
 import NotFound from "./pages/NotFound";
+import Privacy from "./pages/Privacy";
+import Terms from "./pages/Terms";
 
 function App() {
   return (
@@ -105,6 +107,10 @@ function App() {
             <Route path="/unauthorized" element={<Unauthorized />} />
 
             <Route path="/server-error" element={<ServerError />} />
+
+            <Route path="/privacy" element={<Privacy />} />
+
+            <Route path="/terms" element={<Terms />} />
 
             <Route path="*" element={<NotFound />} />
           </Route>
