@@ -1,3 +1,5 @@
+/* eslint-disable react-refresh/only-export-components */
+
 import {
   GoogleAuthProvider,
   createUserWithEmailAndPassword,
@@ -10,7 +12,7 @@ import {
 
 import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
 
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 
 import { auth, db } from "../firebase/firebaseConfig";
 
@@ -118,18 +120,15 @@ export function AuthProvider({ children }) {
     return unsubscribe;
   }, []);
 
-  const contextValue = useMemo(
-    () => ({
-      currentUser,
-      authLoading,
-      isAuthenticated: Boolean(currentUser),
-      register,
-      login,
-      loginWithGoogle,
-      logout,
-    }),
-    [currentUser, authLoading],
-  );
+  const contextValue = {
+    currentUser,
+    authLoading,
+    isAuthenticated: Boolean(currentUser),
+    register,
+    login,
+    loginWithGoogle,
+    logout,
+  };
 
   return (
     <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>
