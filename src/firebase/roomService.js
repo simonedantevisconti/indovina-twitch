@@ -17,6 +17,8 @@ import generateRoomCode from "../utils/generateRoomCode";
 
 const roomsCollection = collection(db, "rooms");
 
+const pendingRoomCreations = new Map();
+
 const normalizeRoomCode = (roomCode) => roomCode.trim().toUpperCase();
 
 const getPlayerData = (user) => ({
@@ -104,10 +106,24 @@ export async function createRoom({ user, type = "private" }) {
     throw new Error("room/invalid-type");
   }
 
-  return createRoomWithUniqueCode({
+  /*
+   * Impedisce allo stesso utente di avviare
+   * più creazioni contemporaneamente.
+   */
+  if (pendingRoomCreations.has(user.uid)) {
+    return pendingRoomCreations.get(user.uid);
+  }
+
+  const creationPromise = createRoomWithUniqueCode({
     user,
     type,
+  }).finally(() => {
+    pendingRoomCreations.delete(user.uid);
   });
+
+  pendingRoomCreations.set(user.uid, creationPromise);
+
+  return creationPromise;
 }
 
 export async function joinRoomByCode({ roomCode, user }) {

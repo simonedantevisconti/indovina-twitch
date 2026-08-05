@@ -1,6 +1,10 @@
 import { getApps, initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
+import {
+  initializeAppCheck,
+  ReCaptchaEnterpriseProvider,
+} from "firebase/app-check";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -18,6 +22,7 @@ const requiredFirebaseVariables = [
   "VITE_FIREBASE_STORAGE_BUCKET",
   "VITE_FIREBASE_MESSAGING_SENDER_ID",
   "VITE_FIREBASE_APP_ID",
+  "VITE_FIREBASE_APPCHECK_SITE_KEY",
 ];
 
 const missingFirebaseVariables = requiredFirebaseVariables.filter(
@@ -33,7 +38,19 @@ if (missingFirebaseVariables.length > 0) {
 const app =
   getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 
+if (import.meta.env.DEV) {
+  globalThis.FIREBASE_APPCHECK_DEBUG_TOKEN =
+    import.meta.env.VITE_FIREBASE_APPCHECK_DEBUG_TOKEN || true;
+}
+
+const appCheck = initializeAppCheck(app, {
+  provider: new ReCaptchaEnterpriseProvider(
+    import.meta.env.VITE_FIREBASE_APPCHECK_SITE_KEY,
+  ),
+  isTokenAutoRefreshEnabled: true,
+});
+
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-export { app, auth, db };
+export { app, appCheck, auth, db };
